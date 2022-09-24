@@ -1,0 +1,15 @@
+__pycache__
+.vscode
+.mypy_cache
+*.egg-info/
+dist
+poetry.lock
+
+test.py
+*.ipynb
+
+tests/_*.py
+coverage.*
+.coverage
+
+docs/build
