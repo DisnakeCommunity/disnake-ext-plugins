@@ -55,7 +55,7 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.pyright]
-include = ["disnake/ext/plugins"]
+include = ["src/disnake/ext/plugins"]
 typeCheckingMode = "strict"
 reportMissingTypeStubs = false
 reportPrivateUsage = false
