@@ -3,16 +3,19 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import logging
-import pathlib
 import sys
 import typing as t
 
 import disnake
 from disnake.ext import commands
 
+from . import utilities
+
 __all__ = ("Plugin",)
 
+
 LOGGER = logging.getLogger(__name__)
+
 
 T = t.TypeVar("T")
 
@@ -74,10 +77,6 @@ class PluginMetadata:
     user_command_attrs: AppCommandParams = dataclasses.field(default_factory=AppCommandParams)
 
 
-def _get_source_module_name() -> str:
-    return pathlib.Path(logging.currentframe().f_code.co_filename).stem
-
-
 class Plugin:
 
     __slots__ = (
@@ -104,7 +103,7 @@ class Plugin:
     _post_unload_hooks: t.List[t.Callable[[], Coro[None]]]
 
     def __init__(self, metadata: t.Optional[PluginMetadata] = None):
-        self.metadata = metadata or PluginMetadata(name=_get_source_module_name())
+        self.metadata = metadata or PluginMetadata(name=utilities.get_source_module_name())
 
         self._commands: t.Dict[str, commands.Command[Plugin, t.Any, t.Any]] = {}  # type: ignore
         self._message_commands: t.Dict[str, commands.InvokableMessageCommand] = {}
@@ -131,7 +130,7 @@ class Plugin:
     ) -> Plugin:
         return cls(
             PluginMetadata(
-                name=name or _get_source_module_name(),
+                name=name or utilities.get_source_module_name(),
                 category=category,
                 command_attrs=command_attrs or {},
                 message_command_attrs=message_command_attrs or {},

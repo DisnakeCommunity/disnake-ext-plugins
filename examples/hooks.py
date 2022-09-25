@@ -1,5 +1,3 @@
-import contextvars
-
 import aiohttp
 
 import disnake
@@ -15,10 +13,12 @@ plugin = plugins.Plugin()
 # For this purpose, plugins provide load and unload hooks, which are async
 # callables that will be called when the plugin is loaded.
 
-# Note: a contextvar is used here to transfer the clientsession through the plugin.
+# Note: a LocalContext is used here to transfer the clientsession through the
+#       plugin. These can be used to pass data around the plugin as if they
+#       were global variables.
 
 
-plugin_session: contextvars.ContextVar[aiohttp.ClientSession] = contextvars.ContextVar("session")
+plugin_session: plugins.LocalContext[aiohttp.ClientSession] = plugins.LocalContext("session")
 
 
 @plugin.load_hook()
