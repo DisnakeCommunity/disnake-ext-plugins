@@ -126,7 +126,7 @@ class Plugin(t.Generic[BotT]):
         ...
 
     def __init__(self, metadata: t.Optional[PluginMetadata] = None):
-        self.metadata = metadata or PluginMetadata(name=_get_source_module_name())
+        self.metadata: PluginMetadata = metadata or PluginMetadata(name=_get_source_module_name())
 
         self._commands: t.Dict[str, commands.Command[Self, t.Any, t.Any]] = {}  # type: ignore
         self._message_commands: t.Dict[str, commands.InvokableMessageCommand] = {}
@@ -155,18 +155,25 @@ class Plugin(t.Generic[BotT]):
 
         Parameters
         ----------
-        name: Optional[`:class:str`]
+        name: Optional[:class:`str`]
             The name of the plugin. Defaults to the module a plugin is created in.
-        category: Optional[`:class:str`]
-            TODO
-        command_attrs:
-            A dict of parameters to apply to each text command in this plugin.
-        message_command_attrs:
+        category: Optional[:class:`str`]
+            The category this plugin belongs to. Does not serve any actual purpose,
+            but may be useful in organising plugins.
+        command_attrs: Dict[:class:`str`, Any]
+            A dict of parameters to apply to each prefix command in this plugin.
+        message_command_attrs: Dict[:class:`str`, Any]
             A dict of parameters to apply to each message command in this plugin.
-        slash_command_attrs:
+        slash_command_attrs: Dict[:class:`str`, Any]
             A dict of parameters to apply to each slash command in this plugin.
-        user_command_attrs:
+        user_command_attrs: Dict[:class:`str`, Any]
             A dict of parameters to apply to each user command in this plugin.
+
+        Returns
+        -------
+        :class:`Plugin`
+            The newly created plugin. In a child class, this would instead
+            return an instance of that child class.
         """
         return cls(
             PluginMetadata(
@@ -191,7 +198,7 @@ class Plugin(t.Generic[BotT]):
 
     @property
     def commands(self) -> t.Sequence[commands.Command[Self, t.Any, t.Any]]:  # type: ignore
-        """All text commands registered in this plugin."""
+        """All prefix commands registered in this plugin."""
         return tuple(self._commands.values())
 
     @property
@@ -209,7 +216,7 @@ class Plugin(t.Generic[BotT]):
         """All message commands registered in this plugin."""
         return tuple(self._message_commands.values())
 
-    def apply_attrs(self, attrs: t.Mapping[str, t.Any], **kwargs: t.Any) -> t.Dict[str, t.Any]:
+    def _apply_attrs(self, attrs: t.Mapping[str, t.Any], **kwargs: t.Any) -> t.Dict[str, t.Any]:
         new_attrs = {**attrs, **{k: v for k, v in kwargs.items() if v is not None}}
         new_attrs.setdefault("extras", {})["metadata"] = self.metadata
         return new_attrs
@@ -223,17 +230,17 @@ class Plugin(t.Generic[BotT]):
         cls: t.Optional[t.Type[commands.Command[t.Any, t.Any, t.Any]]] = None,
         **kwargs: t.Any,
     ) -> CoroDecorator[AnyCommand]:
-        """A decorator that transforms a function into a :class:`.Command`
-        or if called with :func:`.group`, :class:`.Group`.
+        """A decorator that transforms a function into a :class:`commands.Command`
+        or if called with :func:`commands.group`, :class:`commands.Group`.
 
         By default the ``help`` attribute is received automatically from the
         docstring of the function and is cleaned up with the use of
         ``inspect.cleandoc``. If the docstring is ``bytes``, then it is decoded
         into :class:`str` using utf-8 encoding.
 
-        All checks added using the :func:`.check` & co. decorators are added into
-        the function. There is no way to supply your own checks through this
-        decorator.
+        All checks added using the :func:`commands.check` & co. decorators are
+        added into the function. There is no way to supply your own checks
+        through this decorator.
 
         Parameters
         ----------
@@ -241,19 +248,25 @@ class Plugin(t.Generic[BotT]):
             The name to create the command with. By default this uses the
             function name unchanged.
         cls:
-            The class to construct with. By default this is :class:`.Command`.
-            You usually do not change this.
+            The class to construct with. By default this is
+            :class:`commands.Command`. You usually do not change this.
         **kwargs:
             Keyword arguments to pass into the construction of the class denoted
             by ``cls``.
 
+        Returns
+        -------
+        Callable[..., :class:`commands.Command`]
+            A decorator that converts the provided method into a
+            :class:`commands.Command` or a derivative, and returns it.
+
         Raises
         ------
         TypeError
-            If the function is not a coroutine or is already a command.
+            The function is not a coroutine or is already a command.
         """
 
-        attributes = self.apply_attrs(self.metadata.command_attrs, **kwargs)
+        attributes = self._apply_attrs(self.metadata.command_attrs, **kwargs)
 
         if cls is None:
             cls = t.cast(t.Type[AnyCommand], attributes.pop("cls", AnyCommand))
@@ -276,12 +289,35 @@ class Plugin(t.Generic[BotT]):
         cls: t.Optional[t.Type[commands.Group[t.Any, t.Any, t.Any]]] = None,
         **kwargs: t.Any,
     ) -> CoroDecorator[AnyGroup]:
-        """A decorator that transforms a function into a :class:`.Group`.
+        """A decorator that transforms a function into a :class:`commands.Group`.
 
-        This is similar to the :func:`.command` decorator but the ``cls``
-        parameter is set to :class:`Group` by default.
+        This is similar to the :func:`commands.command` decorator but the
+        ``cls`` parameter is set to :class:`Group` by default.
+
+        Parameters
+        ----------
+        name: :class:`str`
+            The name to create the group with. By default this uses the
+            function name unchanged.
+        cls:
+            The class to construct with. By default this is
+            :class:`commands.Group`. You usually do not change this.
+        **kwargs:
+            Keyword arguments to pass into the construction of the class denoted
+            by ``cls``.
+
+        Returns
+        -------
+        Callable[..., :class:`commands.Group`]
+            A decorator that converts the provided method into a
+            :class:`commands.Group` or a derivative, and returns it.
+
+        Raises
+        ------
+        TypeError
+            The function is not a coroutine or is already a command.
         """
-        attributes = self.apply_attrs(self.metadata.command_attrs, **kwargs)
+        attributes = self._apply_attrs(self.metadata.command_attrs, **kwargs)
 
         if cls is None:
             cls = t.cast(t.Type[AnyGroup], attributes.pop("cls", AnyGroup))
@@ -317,16 +353,16 @@ class Plugin(t.Generic[BotT]):
         ----------
         auto_sync: :class:`bool`
             Whether to automatically register the command. Defaults to ``True``.
-        name: Optional[Union[:class:`str`, :class:`.Localized`]]
+        name: Optional[Union[:class:`str`, :class:`disnake.Localized`]]
             The name of the slash command (defaults to function name).
-        description: Optional[Union[:class:`str`, :class:`.Localized`]]
+        description: Optional[Union[:class:`str`, :class:`disnake.Localized`]]
             The description of the slash command. It will be visible in Discord.
         dm_permission: :class:`bool`
             Whether this command can be used in DMs.
             Defaults to ``True``.
-        default_member_permissions: Optional[Union[:class:`.Permissions`, :class:`int`]]
+        default_member_permissions: Optional[Union[:class:`disnake.Permissions`, :class:`int`]]
             The default required permissions for this command.
-            See :attr:`.ApplicationCommand.default_member_permissions` for details.
+            See :attr:`disnake.ApplicationCommand.default_member_permissions` for details.
         guild_ids: List[:class:`int`]
             If specified, the client will register the command in these guilds.
             Otherwise, this command will be registered globally.
@@ -341,12 +377,14 @@ class Plugin(t.Generic[BotT]):
 
             .. note::
                 This object may be copied by the library.
+
         Returns
         -------
-        Callable[..., :class:`InvokableSlashCommand`]
-            A decorator that converts the provided method into an InvokableSlashCommand and returns it.
+        Callable[..., :class:`commands.InvokableSlashCommand`]
+            A decorator that converts the provided method into a
+            :class:`commands.InvokableSlashCommand` and returns it.
         """
-        attributes = self.apply_attrs(
+        attributes = self._apply_attrs(
             self.metadata.slash_command_attrs,
             description=description,
             dm_permission=dm_permission,
@@ -386,14 +424,14 @@ class Plugin(t.Generic[BotT]):
 
         Parameters
         ----------
-        name: Optional[Union[:class:`str`, :class:`.Localized`]]
+        name: Optional[Union[:class:`str`, :class:`disnake.Localized`]]
             The name of the user command (defaults to the function name).
         dm_permission: :class:`bool`
             Whether this command can be used in DMs.
             Defaults to ``True``.
-        default_member_permissions: Optional[Union[:class:`.Permissions`, :class:`int`]]
+        default_member_permissions: Optional[Union[:class:`disnake.Permissions`, :class:`int`]]
             The default required permissions for this command.
-            See :attr:`.ApplicationCommand.default_member_permissions` for details.
+            See :attr:`disnake.ApplicationCommand.default_member_permissions` for details.
         auto_sync: :class:`bool`
             Whether to automatically register the command. Defaults to ``True``.
         guild_ids: Sequence[:class:`int`]
@@ -404,13 +442,15 @@ class Plugin(t.Generic[BotT]):
 
             .. note::
                 This object may be copied by the library.
+
         Returns
         -------
-        Callable[..., :class:`InvokableUserCommand`]
-            A decorator that converts the provided method into an InvokableUserCommand and returns it.
+        Callable[..., :class:`commands.InvokableUserCommand`]
+            A decorator that converts the provided method into a
+            :class:`commands.InvokableUserCommand` and returns it.
         """
 
-        attributes = self.apply_attrs(
+        attributes = self._apply_attrs(
             self.metadata.user_command_attrs,
             dm_permission=dm_permission,
             default_member_permissions=default_member_permissions,
@@ -448,14 +488,14 @@ class Plugin(t.Generic[BotT]):
 
         Parameters
         ----------
-        name: Optional[Union[:class:`str`, :class:`.Localized`]]
+        name: Optional[Union[:class:`str`, :class:`disnake.Localized`]]
             The name of the message command (defaults to the function name).
         dm_permission: :class:`bool`
             Whether this command can be used in DMs.
             Defaults to ``True``.
-        default_member_permissions: Optional[Union[:class:`.Permissions`, :class:`int`]]
+        default_member_permissions: Optional[Union[:class:`disnake.Permissions`, :class:`int`]]
             The default required permissions for this command.
-            See :attr:`.ApplicationCommand.default_member_permissions` for details.
+            See :attr:`disnake.ApplicationCommand.default_member_permissions` for details.
         auto_sync: :class:`bool`
             Whether to automatically register the command. Defaults to ``True``.
         guild_ids: Sequence[:class:`int`]
@@ -466,13 +506,15 @@ class Plugin(t.Generic[BotT]):
 
             .. note::
                 This object may be copied by the library.
+
         Returns
         -------
-        Callable[..., :class:`InvokableMessageCommand`]
-            A decorator that converts the provided method into an InvokableMessageCommand and then returns it.
+        Callable[..., :class:`commands.InvokableMessageCommand`]
+            A decorator that converts the provided method into an
+            :class:`commands.InvokableMessageCommand` and then returns it.
         """
 
-        attributes = self.apply_attrs(
+        attributes = self._apply_attrs(
             self.metadata.user_command_attrs,
             dm_permission=dm_permission,
             default_member_permissions=default_member_permissions,
@@ -514,7 +556,7 @@ class Plugin(t.Generic[BotT]):
     def listener(self, event: t.Optional[str] = None) -> t.Callable[[CoroFuncT], CoroFuncT]:
         """A decorator that marks a function as a listener.
 
-        This is the plugin equivalent of :meth:`.Bot.listen`.
+        This is the plugin equivalent of :meth:`commands.Bot.listen`.
 
         Parameters
         ----------
@@ -532,11 +574,18 @@ class Plugin(t.Generic[BotT]):
     # Plugin (un)loading...
 
     async def load(self, bot: BotT) -> None:
-        """Adds commands to the bot and runs pre- & post-load hooks."""
+        """Registers commands to the bot and runs pre- and post-load hooks.
+
+        Parameters
+        ----------
+        bot: Union[:class:`commands.Bot`, :class:`commands.InteractionBot`]
+            The bot on which to register the plugin's commands.
+        """
         await asyncio.gather(*(hook() for hook in self._pre_load_hooks))
 
-        for command in self._commands.values():
-            bot.add_command(command)  # type: ignore
+        if isinstance(bot, commands.BotBase):
+            for command in self._commands.values():
+                bot.add_command(command)  # type: ignore
 
         for command in self._slash_commands.values():
             bot.add_slash_command(command)
@@ -555,7 +604,13 @@ class Plugin(t.Generic[BotT]):
         LOGGER.info(f"Successfully loaded plugin `{self.metadata.name}`")
 
     async def unload(self, bot: BotT) -> None:
-        """Removes commands to the bot and runs pre- & post-unload hooks."""
+        """Removes commands from the bot and runs pre- and post-unload hooks.
+
+        Parameters
+        ----------
+        bot: Union[:class:`commands.Bot`, :class:`commands.InteractionBot`]
+            The bot from which to unload the plugin's commands.
+        """
         await asyncio.gather(*(hook() for hook in self._pre_unload_hooks))
 
         if isinstance(bot, commands.BotBase):
@@ -584,7 +639,7 @@ class Plugin(t.Generic[BotT]):
         Parameters
         ----------
         post: :class:`bool`
-            Whether the hook is a post-load or pre-load.
+            Whether the hook is a post-load or pre-load hook.
         """
         hooks = self._post_load_hooks if post else self._pre_load_hooks
 
@@ -600,7 +655,7 @@ class Plugin(t.Generic[BotT]):
         Parameters
         ----------
         post: :class:`bool`
-            Whether the hook is a post-unload or pre-unload.
+            Whether the hook is a post-unload or pre-unload hook.
         """
 
         hooks = self._post_unload_hooks if post else self._pre_unload_hooks
@@ -612,7 +667,11 @@ class Plugin(t.Generic[BotT]):
         return wrapper
 
     def create_extension_handlers(self) -> t.Tuple[SetupFunc[BotT], SetupFunc[BotT]]:
-        """Creates the setup & teardown handlers for an extension."""
+        """Create basic setup and teardown handlers for an extension.
+
+        Simply put, these functions ensure :meth:`.load` and :meth:`.unload`
+        are called when the plugin is loaded or unloaded, respectively.
+        """
         def setup(bot: BotT) -> None:
             asyncio.create_task(self.load(bot))
 
