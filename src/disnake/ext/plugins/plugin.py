@@ -4,6 +4,7 @@ import asyncio
 import dataclasses
 import logging
 import pathlib
+import sys
 import typing as t
 
 import disnake
@@ -13,9 +14,14 @@ __all__ = ("Plugin",)
 
 LOGGER = logging.getLogger(__name__)
 
-
 T = t.TypeVar("T")
-P = t.ParamSpec("P")
+
+if sys.version_info <= (3, 9):
+    import typing_extensions
+    P = typing_extensions.ParamSpec("P")
+else:
+    P = t.ParamSpec("P")
+
 Coro = t.Coroutine[t.Any, t.Any, T]
 EmptyAsync = t.Callable[[], Coro[None]]
 SetupFunc = t.Callable[[commands.Bot], None]
@@ -159,7 +165,7 @@ class Plugin:
         return tuple(self._message_commands.values())
 
     def apply_attrs(self, attrs: t.Mapping[str, t.Any], **kwargs: t.Any) -> t.Dict[str, t.Any]:
-        new_attrs = attrs | {k: v for k, v in kwargs.items() if v is not None}
+        new_attrs = {**attrs, **{k: v for k, v in kwargs.items() if v is not None}}
         new_attrs.setdefault("extras", {})["metadata"] = self.metadata
         return new_attrs
 
