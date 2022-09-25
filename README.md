@@ -16,8 +16,6 @@ Installing
 ----------
 **Python 3.8 or higher is required**
 
-**Python 3.8 or higher is required**
-
 To install the extension, run the following command in your command prompt/shell:
 
 ``` sh
