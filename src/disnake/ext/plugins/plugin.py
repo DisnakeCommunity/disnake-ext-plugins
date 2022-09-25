@@ -95,6 +95,8 @@ class Plugin:
         "_post_unload_hooks",
     )
 
+    metadata: PluginMetadata
+
     # Mostly just here to easily run async code at (un)load time while we wait
     # for disnake's async refactor. I will probably leave these in for lower
     # disnake versions, but they may be removed someday.
@@ -177,7 +179,7 @@ class Plugin:
         *,
         cls: t.Optional[t.Type[commands.Command[t.Any, t.Any, t.Any]]] = None,
         **kwargs: t.Any,
-    ):
+    ) -> CoroDecorator[AnyCommand]:
         attributes = self.apply_attrs(self.metadata.command_attrs, name=name, **kwargs)
 
         if cls is None:
@@ -203,7 +205,7 @@ class Plugin:
         *,
         cls: t.Optional[t.Type[commands.Group[t.Any, t.Any, t.Any]]],
         **kwargs: t.Any,
-    ):
+    ) -> CoroDecorator[AnyGroup]:
         attributes = self.apply_attrs(self.metadata.command_attrs, name=name, **kwargs)
 
         if cls is None:
@@ -329,7 +331,7 @@ class Plugin:
             key = callback.__name__ if event is None else event
             self._listeners.setdefault(key, []).append(callback)
 
-    def listener(self, event: t.Optional[str] = None):
+    def listener(self, event: t.Optional[str] = None) -> t.Callable[[CoroFuncT], CoroFuncT]:
         def decorator(callback: CoroFuncT) -> CoroFuncT:
             self.add_listeners(callback, event=event)
             return callback
