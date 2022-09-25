@@ -18,6 +18,7 @@ T = t.TypeVar("T")
 
 if sys.version_info <= (3, 9):
     import typing_extensions
+
     P = typing_extensions.ParamSpec("P")
 else:
     P = t.ParamSpec("P")
