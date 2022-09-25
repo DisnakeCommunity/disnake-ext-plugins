@@ -13,3 +13,5 @@ coverage.*
 .coverage
 
 docs/build
+
+*.venv

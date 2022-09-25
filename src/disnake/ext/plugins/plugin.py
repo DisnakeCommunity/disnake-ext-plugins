@@ -7,6 +7,8 @@ import pathlib
 import sys
 import typing as t
 
+from typing_extensions import Self
+
 import disnake
 from disnake.ext import commands
 
@@ -23,9 +25,19 @@ if sys.version_info <= (3, 9):
 else:
     P = t.ParamSpec("P")
 
+BotT = t.TypeVar(
+    "BotT",
+    bound=t.Union[
+        commands.Bot,
+        commands.AutoShardedBot,
+        commands.InteractionBot,
+        commands.AutoShardedInteractionBot,
+    ],
+)
+
 Coro = t.Coroutine[t.Any, t.Any, T]
 EmptyAsync = t.Callable[[], Coro[None]]
-SetupFunc = t.Callable[[commands.Bot], None]
+SetupFunc = t.Callable[[BotT], None]
 
 AnyCommand = commands.Command[t.Any, t.Any, t.Any]
 AnyGroup = commands.Group[t.Any, t.Any, t.Any]
@@ -78,9 +90,10 @@ def _get_source_module_name() -> str:
     return pathlib.Path(logging.currentframe().f_code.co_filename).stem
 
 
-class Plugin:
+class Plugin(t.Generic[BotT]):
 
     __slots__ = (
+        "bot",
         "metadata",
         "_commands",
         "_slash_commands",
@@ -93,6 +106,7 @@ class Plugin:
         "_post_unload_hooks",
     )
 
+    bot: BotT
     metadata: PluginMetadata
 
     # Mostly just here to easily run async code at (un)load time while we wait
@@ -103,10 +117,18 @@ class Plugin:
     _pre_unload_hooks: t.List[t.Callable[[], Coro[None]]]
     _post_unload_hooks: t.List[t.Callable[[], Coro[None]]]
 
+    @t.overload
+    def __init__(self: Plugin[commands.Bot], metadata: t.Optional[PluginMetadata] = None):
+        ...
+
+    @t.overload
+    def __init__(self, metadata: t.Optional[PluginMetadata] = None):
+        ...
+
     def __init__(self, metadata: t.Optional[PluginMetadata] = None):
         self.metadata = metadata or PluginMetadata(name=_get_source_module_name())
 
-        self._commands: t.Dict[str, commands.Command[Plugin, t.Any, t.Any]] = {}  # type: ignore
+        self._commands: t.Dict[str, commands.Command[Self, t.Any, t.Any]] = {}  # type: ignore
         self._message_commands: t.Dict[str, commands.InvokableMessageCommand] = {}
         self._slash_commands: t.Dict[str, commands.InvokableSlashCommand] = {}
         self._user_commands: t.Dict[str, commands.InvokableUserCommand] = {}
@@ -128,7 +150,7 @@ class Plugin:
         message_command_attrs: t.Optional[AppCommandParams] = None,
         slash_command_attrs: t.Optional[SlashCommandParams] = None,
         user_command_attrs: t.Optional[AppCommandParams] = None,
-    ) -> Plugin:
+    ) -> Self:
         """Create a Plugin with metadata.
 
         Parameters
@@ -168,7 +190,7 @@ class Plugin:
         return self.metadata.category
 
     @property
-    def commands(self) -> t.Sequence[commands.Command[Plugin, t.Any, t.Any]]:  # type: ignore
+    def commands(self) -> t.Sequence[commands.Command[Self, t.Any, t.Any]]:  # type: ignore
         """All text commands registered in this plugin."""
         return tuple(self._commands.values())
 
@@ -509,7 +531,7 @@ class Plugin:
 
     # Plugin (un)loading...
 
-    async def load(self, bot: commands.Bot) -> None:
+    async def load(self, bot: BotT) -> None:
         """Adds commands to the bot and runs pre- & post-load hooks."""
         await asyncio.gather(*(hook() for hook in self._pre_load_hooks))
 
@@ -532,12 +554,13 @@ class Plugin:
         await asyncio.gather(*(hook() for hook in self._post_load_hooks))
         LOGGER.info(f"Successfully loaded plugin `{self.metadata.name}`")
 
-    async def unload(self, bot: commands.Bot) -> None:
+    async def unload(self, bot: BotT) -> None:
         """Removes commands to the bot and runs pre- & post-unload hooks."""
         await asyncio.gather(*(hook() for hook in self._pre_unload_hooks))
 
-        for command in self._commands.keys():
-            bot.remove_command(command)
+        if isinstance(bot, commands.BotBase):
+            for command in self._commands.keys():
+                bot.remove_command(command)
 
         for command in self._slash_commands.keys():
             bot.remove_slash_command(command)
@@ -588,12 +611,12 @@ class Plugin:
 
         return wrapper
 
-    def create_extension_handlers(self) -> t.Tuple[SetupFunc, SetupFunc]:
+    def create_extension_handlers(self) -> t.Tuple[SetupFunc[BotT], SetupFunc[BotT]]:
         """Creates the setup & teardown handlers for an extension."""
-        def setup(bot: commands.Bot) -> None:
+        def setup(bot: BotT) -> None:
             asyncio.create_task(self.load(bot))
 
-        def teardown(bot: commands.Bot) -> None:
+        def teardown(bot: BotT) -> None:
             asyncio.create_task(self.unload(bot))
 
         return setup, teardown
