@@ -91,7 +91,22 @@ def _get_source_module_name() -> str:
 
 
 class Plugin(t.Generic[BotT]):
+    """An extension manager similar to disnake's :class:`commands.Cog`.
+    A plugin can hold commands and listeners, and supports being loaded through
+    `bot.load_extension()` as per usual, and can similarly be unloaded and
+    reloaded.
 
+    Plugins can be constructed via :meth:`.with_metadata` to provide extra
+    information to the plugin.
+
+    Parameters
+    ----------
+    metadata: Optional[:class:`PluginMetadata`]
+        The metadata to supply to the plugin. This can be left blank, which will
+        create a plugin with name defaulting to the filename in which the plugin
+        is instantiated; and no other metadata. In case actual metadata is
+        desired, it is advised to use :meth:`.with_metadata` instead.
+    """
     __slots__ = (
         "bot",
         "metadata",
@@ -107,15 +122,12 @@ class Plugin(t.Generic[BotT]):
     )
 
     bot: BotT
-    metadata: PluginMetadata
+    """The bot on which this plugin is registered. This will only be available
+    after calling :meth:`.load`.
+    """
 
-    # Mostly just here to easily run async code at (un)load time while we wait
-    # for disnake's async refactor. I will probably leave these in for lower
-    # disnake versions, but they may be removed someday.
-    _pre_load_hooks: t.List[t.Callable[[], Coro[None]]]
-    _post_load_hooks: t.List[t.Callable[[], Coro[None]]]
-    _pre_unload_hooks: t.List[t.Callable[[], Coro[None]]]
-    _post_unload_hooks: t.List[t.Callable[[], Coro[None]]]
+    metadata: PluginMetadata
+    """The metadata assigned to the plugin."""
 
     @t.overload
     def __init__(self: Plugin[commands.Bot], metadata: t.Optional[PluginMetadata] = None):
@@ -135,10 +147,14 @@ class Plugin(t.Generic[BotT]):
 
         self._listeners: t.Dict[str, t.MutableSequence[CoroFunc]] = {}
 
-        self._pre_load_hooks = []
-        self._post_load_hooks = []
-        self._pre_unload_hooks = []
-        self._post_unload_hooks = []
+        # These are mainly here to easily run async code at (un)load time
+        # while we wait for disnake's async refactor. These will probably be
+        # left in for lower disnake versions, though they may be removed someday.
+
+        self._pre_load_hooks: t.MutableSequence[EmptyAsync] = []
+        self._post_load_hooks: t.MutableSequence[EmptyAsync] = []
+        self._pre_unload_hooks: t.MutableSequence[EmptyAsync] = []
+        self._post_unload_hooks: t.MutableSequence[EmptyAsync] = []
 
     @classmethod
     def with_metadata(
@@ -156,7 +172,7 @@ class Plugin(t.Generic[BotT]):
         Parameters
         ----------
         name: Optional[:class:`str`]
-            The name of the plugin. Defaults to the module a plugin is created in.
+            The name of the plugin. Defaults to the module the plugin is created in.
         category: Optional[:class:`str`]
             The category this plugin belongs to. Does not serve any actual purpose,
             but may be useful in organising plugins.
