@@ -39,11 +39,9 @@ PermissionsOptional = t.Optional[t.Union[disnake.Permissions, int]]
 
 
 class CommandParams(t.TypedDict, total=False):
-    name: str
     help: str
     brief: str
     usage: str
-    aliases: t.Union[t.List[str], t.Tuple[str]]
     enabled: bool
     description: str
     hidden: bool
@@ -53,7 +51,6 @@ class CommandParams(t.TypedDict, total=False):
 
 
 class AppCommandParams(t.TypedDict, total=False):
-    name: LocalizedOptional
     auto_sync: bool
     dm_permission: bool
     default_member_permissions: PermissionsOptional
@@ -181,19 +178,16 @@ class Plugin:
         cls: t.Optional[t.Type[commands.Command[t.Any, t.Any, t.Any]]] = None,
         **kwargs: t.Any,
     ) -> CoroDecorator[AnyCommand]:
-        attributes = self.apply_attrs(self.metadata.command_attrs, name=name, **kwargs)
+        attributes = self.apply_attrs(self.metadata.command_attrs, **kwargs)
 
         if cls is None:
             cls = t.cast(t.Type[AnyCommand], attributes.pop("cls", AnyCommand))
 
         def decorator(callback: t.Callable[..., Coro[t.Any]]) -> AnyCommand:
             if not asyncio.iscoroutinefunction(callback):
-                raise TypeError(f"<{callback.__qualname__}> must be a coroutine function")
+                raise TypeError(f"<{callback.__qualname__}> must be a coroutine function.")
 
-            if attributes["name"] is None:
-                attributes["name"] = callback.__name__
-
-            command = cls(callback, **attributes)
+            command = cls(callback, name=name or callback.__name__, **attributes)
             self._commands[command.qualified_name] = command
 
             return command
@@ -207,19 +201,16 @@ class Plugin:
         cls: t.Optional[t.Type[commands.Group[t.Any, t.Any, t.Any]]],
         **kwargs: t.Any,
     ) -> CoroDecorator[AnyGroup]:
-        attributes = self.apply_attrs(self.metadata.command_attrs, name=name, **kwargs)
+        attributes = self.apply_attrs(self.metadata.command_attrs, **kwargs)
 
         if cls is None:
             cls = t.cast(t.Type[AnyGroup], attributes.pop("cls", AnyGroup))
 
         def decorator(callback: t.Callable[..., Coro[t.Any]]) -> AnyGroup:
             if not asyncio.iscoroutinefunction(callback):
-                raise TypeError(f"<{callback.__qualname__}> must be a coroutine function")
+                raise TypeError(f"<{callback.__qualname__}> must be a coroutine function.")
 
-            if attributes["name"] is None:
-                attributes["name"] = callback.__name__
-
-            command = cls(callback, **attributes)
+            command = cls(callback, name=name or callback.__name__, **attributes)
             self._commands[command.qualified_name] = command  # type: ignore
 
             return command
@@ -242,7 +233,6 @@ class Plugin:
     ) -> CoroDecorator[commands.InvokableSlashCommand]:
         attributes = self.apply_attrs(
             self.metadata.slash_command_attrs,
-            name=name,
             description=description,
             dm_permission=dm_permission,
             default_member_permissions=default_member_permissions,
@@ -256,7 +246,11 @@ class Plugin:
             if not asyncio.iscoroutinefunction(callback):
                 raise TypeError(f"<{callback.__qualname__}> must be a coroutine function")
 
-            command = commands.InvokableSlashCommand(callback, **attributes)
+            command = commands.InvokableSlashCommand(
+                callback,
+                name=name or callback.__name__,
+                **attributes,
+            )
             self._slash_commands[command.qualified_name] = command
 
             return command
@@ -275,7 +269,6 @@ class Plugin:
     ) -> CoroDecorator[commands.InvokableUserCommand]:
         attributes = self.apply_attrs(
             self.metadata.user_command_attrs,
-            name=name,
             dm_permission=dm_permission,
             default_member_permissions=default_member_permissions,
             guild_ids=guild_ids,
@@ -287,7 +280,11 @@ class Plugin:
             if not asyncio.iscoroutinefunction(callback):
                 raise TypeError(f"<{callback.__qualname__}> must be a coroutine function")
 
-            command = commands.InvokableUserCommand(callback, **attributes)
+            command = commands.InvokableUserCommand(
+                callback,
+                name=name or callback.__name__,
+                **attributes,
+            )
             self._user_commands[command.qualified_name] = command
 
             return command
@@ -306,7 +303,6 @@ class Plugin:
     ) -> CoroDecorator[commands.InvokableMessageCommand]:
         attributes = self.apply_attrs(
             self.metadata.user_command_attrs,
-            name=name,
             dm_permission=dm_permission,
             default_member_permissions=default_member_permissions,
             guild_ids=guild_ids,
@@ -318,7 +314,11 @@ class Plugin:
             if not asyncio.iscoroutinefunction(callback):
                 raise TypeError(f"<{callback.__qualname__}> must be a coroutine function")
 
-            command = commands.InvokableMessageCommand(callback, **attributes)
+            command = commands.InvokableMessageCommand(
+                callback,
+                name=name or callback.__name__,
+                **attributes,
+            )
             self._message_commands[command.qualified_name] = command
 
             return command
@@ -342,7 +342,7 @@ class Plugin:
     # Plugin (un)loading...
 
     async def load(self, bot: commands.Bot) -> None:
-        await asyncio.gather(hook() for hook in self._pre_load_hooks)
+        await asyncio.gather(*(hook() for hook in self._pre_load_hooks))
 
         for command in self._commands.values():
             bot.add_command(command)  # type: ignore
@@ -360,11 +360,11 @@ class Plugin:
             for listener in listeners:
                 bot.add_listener(listener, event)
 
-        await asyncio.gather(hook() for hook in self._post_load_hooks)
+        await asyncio.gather(*(hook() for hook in self._post_load_hooks))
         LOGGER.info(f"Successfully loaded plugin `{self.metadata.name}`")
 
     async def unload(self, bot: commands.Bot) -> None:
-        await asyncio.gather(hook() for hook in self._pre_unload_hooks)
+        await asyncio.gather(*(hook() for hook in self._pre_unload_hooks))
 
         for command in self._commands.keys():
             bot.remove_command(command)
@@ -382,7 +382,7 @@ class Plugin:
             for listener in listeners:
                 bot.remove_listener(listener, event)
 
-        await asyncio.gather(hook() for hook in self._post_unload_hooks)
+        await asyncio.gather(*(hook() for hook in self._post_unload_hooks))
         LOGGER.info(f"Successfully unloaded plugin `{self.metadata.name}`")
 
     def load_hook(self, post: bool = False) -> t.Callable[[EmptyAsync], EmptyAsync]:
