@@ -107,6 +107,7 @@ class Plugin(t.Generic[BotT]):
         is instantiated; and no other metadata. In case actual metadata is
         desired, it is advised to use :meth:`.with_metadata` instead.
     """
+
     __slots__ = (
         "bot",
         "metadata",
@@ -688,6 +689,7 @@ class Plugin(t.Generic[BotT]):
         Simply put, these functions ensure :meth:`.load` and :meth:`.unload`
         are called when the plugin is loaded or unloaded, respectively.
         """
+
         def setup(bot: BotT) -> None:
             asyncio.create_task(self.load(bot))
 
