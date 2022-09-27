@@ -598,6 +598,8 @@ class Plugin(t.Generic[BotT]):
         bot: Union[:class:`commands.Bot`, :class:`commands.InteractionBot`]
             The bot on which to register the plugin's commands.
         """
+        self.bot = bot
+
         await asyncio.gather(*(hook() for hook in self._pre_load_hooks))
 
         if isinstance(bot, commands.BotBase):
