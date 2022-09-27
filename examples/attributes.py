@@ -1,5 +1,5 @@
 import disnake
-from disnake.ext import commands, plugins
+from disnake.ext import plugins
 
 # Parameters specified inside the plugin metadata's `command_attrs`,
 # `message_command_attrs`, `slash_command_attrs`, and `user_command_attrs`
@@ -7,9 +7,7 @@ from disnake.ext import commands, plugins
 # message commands, slash commands and user commands, respectively.
 
 
-plugin: plugins.Plugin[commands.Bot] = plugins.Plugin.with_metadata(
-    slash_command_attrs={"guild_ids": [1234]}
-)
+plugin = plugins.Plugin(slash_command_attrs={"guild_ids": [1234]})
 
 
 # This slash command will automatically receive the `guild_ids = [1234]`
