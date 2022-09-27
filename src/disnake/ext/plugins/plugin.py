@@ -101,11 +101,19 @@ class Plugin(t.Generic[BotT]):
 
     Parameters
     ----------
-    metadata: Optional[:class:`PluginMetadata`]
-        The metadata to supply to the plugin. This can be left blank, which will
-        create a plugin with name defaulting to the filename in which the plugin
-        is instantiated; and no other metadata. In case actual metadata is
-        desired, it is advised to use :meth:`.with_metadata` instead.
+    name: Optional[:class:`str`]
+        The name of the plugin. Defaults to the module the plugin is created in.
+    category: Optional[:class:`str`]
+        The category this plugin belongs to. Does not serve any actual purpose,
+        but may be useful in organising plugins.
+    command_attrs: Dict[:class:`str`, Any]
+        A dict of parameters to apply to each prefix command in this plugin.
+    message_command_attrs: Dict[:class:`str`, Any]
+        A dict of parameters to apply to each message command in this plugin.
+    slash_command_attrs: Dict[:class:`str`, Any]
+        A dict of parameters to apply to each slash command in this plugin.
+    user_command_attrs: Dict[:class:`str`, Any]
+        A dict of parameters to apply to each user command in this plugin.
     """
 
     __slots__ = (
@@ -131,15 +139,49 @@ class Plugin(t.Generic[BotT]):
     """The metadata assigned to the plugin."""
 
     @t.overload
-    def __init__(self: Plugin[commands.Bot], metadata: t.Optional[PluginMetadata] = None):
+    def __init__(
+        self: Plugin[commands.Bot],
+        *,
+        name: t.Optional[str] = None,
+        category: t.Optional[str] = None,
+        command_attrs: t.Optional[CommandParams] = None,
+        message_command_attrs: t.Optional[AppCommandParams] = None,
+        slash_command_attrs: t.Optional[SlashCommandParams] = None,
+        user_command_attrs: t.Optional[AppCommandParams] = None,
+    ):
         ...
 
     @t.overload
-    def __init__(self, metadata: t.Optional[PluginMetadata] = None):
+    def __init__(
+        self,
+        *,
+        name: t.Optional[str] = None,
+        category: t.Optional[str] = None,
+        command_attrs: t.Optional[CommandParams] = None,
+        message_command_attrs: t.Optional[AppCommandParams] = None,
+        slash_command_attrs: t.Optional[SlashCommandParams] = None,
+        user_command_attrs: t.Optional[AppCommandParams] = None,
+    ):
         ...
 
-    def __init__(self, metadata: t.Optional[PluginMetadata] = None):
-        self.metadata: PluginMetadata = metadata or PluginMetadata(name=_get_source_module_name())
+    def __init__(
+        self,
+        *,
+        name: t.Optional[str] = None,
+        category: t.Optional[str] = None,
+        command_attrs: t.Optional[CommandParams] = None,
+        message_command_attrs: t.Optional[AppCommandParams] = None,
+        slash_command_attrs: t.Optional[SlashCommandParams] = None,
+        user_command_attrs: t.Optional[AppCommandParams] = None,
+    ):
+        self.metadata: PluginMetadata = PluginMetadata(
+            name=name or _get_source_module_name(),
+            category=category,
+            command_attrs=command_attrs or {},
+            message_command_attrs=message_command_attrs or {},
+            slash_command_attrs=slash_command_attrs or {},
+            user_command_attrs=user_command_attrs or {},
+        )
 
         self._commands: t.Dict[str, commands.Command[Self, t.Any, t.Any]] = {}  # type: ignore
         self._message_commands: t.Dict[str, commands.InvokableMessageCommand] = {}
@@ -158,33 +200,13 @@ class Plugin(t.Generic[BotT]):
         self._post_unload_hooks: t.MutableSequence[EmptyAsync] = []
 
     @classmethod
-    def with_metadata(
-        cls,
-        *,
-        name: t.Optional[str] = None,
-        category: t.Optional[str] = None,
-        command_attrs: t.Optional[CommandParams] = None,
-        message_command_attrs: t.Optional[AppCommandParams] = None,
-        slash_command_attrs: t.Optional[SlashCommandParams] = None,
-        user_command_attrs: t.Optional[AppCommandParams] = None,
-    ) -> Self:
-        """Create a Plugin with metadata.
+    def with_metadata(cls, metadata: PluginMetadata) -> Self:
+        """Create a Plugin with pre-existing metadata.
 
         Parameters
         ----------
-        name: Optional[:class:`str`]
-            The name of the plugin. Defaults to the module the plugin is created in.
-        category: Optional[:class:`str`]
-            The category this plugin belongs to. Does not serve any actual purpose,
-            but may be useful in organising plugins.
-        command_attrs: Dict[:class:`str`, Any]
-            A dict of parameters to apply to each prefix command in this plugin.
-        message_command_attrs: Dict[:class:`str`, Any]
-            A dict of parameters to apply to each message command in this plugin.
-        slash_command_attrs: Dict[:class:`str`, Any]
-            A dict of parameters to apply to each slash command in this plugin.
-        user_command_attrs: Dict[:class:`str`, Any]
-            A dict of parameters to apply to each user command in this plugin.
+        metadata: Optional[:class:`PluginMetadata`]
+            The metadata to supply to the plugin.
 
         Returns
         -------
@@ -192,16 +214,9 @@ class Plugin(t.Generic[BotT]):
             The newly created plugin. In a child class, this would instead
             return an instance of that child class.
         """
-        return cls(
-            PluginMetadata(
-                name=name or _get_source_module_name(),
-                category=category,
-                command_attrs=command_attrs or {},
-                message_command_attrs=message_command_attrs or {},
-                slash_command_attrs=slash_command_attrs or {},
-                user_command_attrs=user_command_attrs or {},
-            )
-        )
+        self = cls()
+        self.metadata = metadata
+        return self
 
     @property
     def name(self) -> str:
