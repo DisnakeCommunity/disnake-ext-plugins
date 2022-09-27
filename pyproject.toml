@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "disnake-ext-plugins"
-version = "0.1.0a1"
+version = "0.1.1"
 description = "An extension for disnake providing a robust alternative to cogs."
 authors = ["Chromosomologist <chromosomologist@gmail.com>"]
 license = "MIT"
