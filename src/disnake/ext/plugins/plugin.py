@@ -87,7 +87,9 @@ class PluginMetadata:
 
 
 def _get_source_module_name() -> str:
-    return pathlib.Path(logging.currentframe().f_code.co_filename).stem
+    module_name = pathlib.Path(logging.currentframe().f_code.co_filename).stem
+    LOGGER.debug(f"Module name resolved to {module_name!r}")
+    return module_name
 
 
 class Plugin(t.Generic[BotT]):
@@ -114,11 +116,14 @@ class Plugin(t.Generic[BotT]):
         A dict of parameters to apply to each slash command in this plugin.
     user_command_attrs: Dict[:class:`str`, Any]
         A dict of parameters to apply to each user command in this plugin.
+    logger: Optional[Union[:class:`logging.Logger`, :class:`str`]]
+        The logger or its name to use when logging plugin events.
     """
 
     __slots__ = (
         "bot",
         "metadata",
+        "logger",
         "_commands",
         "_slash_commands",
         "_message_commands",
@@ -138,6 +143,9 @@ class Plugin(t.Generic[BotT]):
     metadata: PluginMetadata
     """The metadata assigned to the plugin."""
 
+    logger: logging.Logger
+    """The logger associated with this plugin."""
+
     @t.overload
     def __init__(
         self: Plugin[commands.Bot],
@@ -148,6 +156,7 @@ class Plugin(t.Generic[BotT]):
         message_command_attrs: t.Optional[AppCommandParams] = None,
         slash_command_attrs: t.Optional[SlashCommandParams] = None,
         user_command_attrs: t.Optional[AppCommandParams] = None,
+        logger: t.Union[logging.Logger, str, None] = None,
     ):
         ...
 
@@ -161,6 +170,7 @@ class Plugin(t.Generic[BotT]):
         message_command_attrs: t.Optional[AppCommandParams] = None,
         slash_command_attrs: t.Optional[SlashCommandParams] = None,
         user_command_attrs: t.Optional[AppCommandParams] = None,
+        logger: t.Union[logging.Logger, str, None] = None,
     ):
         ...
 
@@ -173,6 +183,7 @@ class Plugin(t.Generic[BotT]):
         message_command_attrs: t.Optional[AppCommandParams] = None,
         slash_command_attrs: t.Optional[SlashCommandParams] = None,
         user_command_attrs: t.Optional[AppCommandParams] = None,
+        logger: t.Union[logging.Logger, str, None] = None,
     ):
         self.metadata: PluginMetadata = PluginMetadata(
             name=name or _get_source_module_name(),
@@ -182,6 +193,15 @@ class Plugin(t.Generic[BotT]):
             slash_command_attrs=slash_command_attrs or {},
             user_command_attrs=user_command_attrs or {},
         )
+
+        if logger is not None:
+            if isinstance(logger, str):
+                logger = logging.getLogger(logger)
+
+        else:
+            logger = LOGGER
+
+        self.logger = logger
 
         self._commands: t.Dict[str, commands.Command[Self, t.Any, t.Any]] = {}  # type: ignore
         self._message_commands: t.Dict[str, commands.InvokableMessageCommand] = {}
@@ -635,7 +655,7 @@ class Plugin(t.Generic[BotT]):
                 bot.add_listener(listener, event)
 
         await asyncio.gather(*(hook() for hook in self._post_load_hooks))
-        LOGGER.info(f"Successfully loaded plugin `{self.metadata.name}`")
+        self.logger.info(f"Successfully loaded plugin `{self.metadata.name}`")
 
     async def unload(self, bot: BotT) -> None:
         """Removes commands from the bot and runs pre- and post-unload hooks.
@@ -665,7 +685,7 @@ class Plugin(t.Generic[BotT]):
                 bot.remove_listener(listener, event)
 
         await asyncio.gather(*(hook() for hook in self._post_unload_hooks))
-        LOGGER.info(f"Successfully unloaded plugin `{self.metadata.name}`")
+        self.logger.info(f"Successfully unloaded plugin `{self.metadata.name}`")
 
     def load_hook(self, post: bool = False) -> t.Callable[[EmptyAsync], EmptyAsync]:
         """A decorator that marks a function as a load hook.
