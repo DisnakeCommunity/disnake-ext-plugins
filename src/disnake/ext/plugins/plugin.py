@@ -118,6 +118,7 @@ class Plugin(t.Generic[BotT]):
         A dict of parameters to apply to each user command in this plugin.
     logger: Optional[Union[:class:`logging.Logger`, :class:`str`]]
         The logger or its name to use when logging plugin events.
+        If not specified, defaults to `disnake.ext.plugins.plugin`.
     """
 
     __slots__ = (
