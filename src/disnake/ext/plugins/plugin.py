@@ -12,6 +12,10 @@ from typing_extensions import Self
 import disnake
 from disnake.ext import commands
 
+if t.TYPE_CHECKING:
+    from disnake.ext import tasks
+
+
 __all__ = ("Plugin",)
 
 LOGGER = logging.getLogger(__name__)
@@ -48,6 +52,8 @@ CoroDecorator = t.Callable[[CoroFunc], T]
 
 LocalizedOptional = t.Union[t.Optional[str], disnake.Localized[t.Optional[str]]]
 PermissionsOptional = t.Optional[t.Union[disnake.Permissions, int]]
+
+LoopT = t.TypeVar("LoopT", bound="tasks.Loop[t.Any]")
 
 
 class CommandParams(t.TypedDict, total=False):
@@ -134,6 +140,7 @@ class Plugin(t.Generic[BotT]):
         "_slash_commands",
         "_message_commands",
         "_listeners",
+        "_loops",
         "_user_commands",
         "_pre_load_hooks",
         "_post_load_hooks",
@@ -215,6 +222,7 @@ class Plugin(t.Generic[BotT]):
         self._user_commands: t.Dict[str, commands.InvokableUserCommand] = {}
 
         self._listeners: t.Dict[str, t.MutableSequence[CoroFunc]] = {}
+        self._loops: t.List[tasks.Loop[t.Any]] = []
 
         # These are mainly here to easily run async code at (un)load time
         # while we wait for disnake's async refactor. These will probably be
@@ -273,6 +281,10 @@ class Plugin(t.Generic[BotT]):
     def message_commands(self) -> t.Sequence[commands.InvokableMessageCommand]:
         """All message commands registered in this plugin."""
         return tuple(self._message_commands.values())
+
+    @property
+    def loops(self) -> t.Sequence[tasks.Loop[t.Any]]:
+        return tuple(self._loops)
 
     def _apply_attrs(self, attrs: t.Mapping[str, t.Any], **kwargs: t.Any) -> t.Dict[str, t.Any]:
         new_attrs = {**attrs, **{k: v for k, v in kwargs.items() if v is not None}}
@@ -629,6 +641,38 @@ class Plugin(t.Generic[BotT]):
 
         return decorator
 
+    # Tasks
+
+    def register_loop(self, *, wait_until_ready: bool = False) -> t.Callable[[LoopT], LoopT]:
+        """A decorator that registers a loop to be automatically started and
+        stopped along with the plugin being loaded and unloaded.
+        Parameters
+        ----------
+        wait_until_ready: :class:`bool`
+            Whether or not to add a simple `loop.before_loop` callback that waits
+            until the bot is ready. This can be handy if you load plugins before
+            you start the bot (which you should!) and make api requests with a
+            loop.
+            .. warn::
+                This only works if the loop does not already have a `before_loop`
+                callback registered.
+        """
+
+        def decorator(loop: LoopT) -> LoopT:
+            if wait_until_ready:
+                if loop._before_loop is not None:
+                    raise TypeError("This loop already has a `before_loop` callback registered.")
+
+                async def _before_loop():
+                    await self.bot.wait_until_ready()
+
+                loop.before_loop(_before_loop)
+
+            self._loops.append(loop)
+            return loop
+
+        return decorator
+
     # Plugin (un)loading...
 
     async def load(self, bot: BotT) -> None:
@@ -660,6 +704,9 @@ class Plugin(t.Generic[BotT]):
             for listener in listeners:
                 bot.add_listener(listener, event)
 
+        for loop in self._loops:
+            loop.start()
+
         await asyncio.gather(*(hook() for hook in self._post_load_hooks))
         self.logger.info(f"Successfully loaded plugin `{self.metadata.name}`")
 
@@ -689,6 +736,9 @@ class Plugin(t.Generic[BotT]):
         for event, listeners in self._listeners.items():
             for listener in listeners:
                 bot.remove_listener(listener, event)
+
+        for loop in self._loops:
+            loop.cancel()
 
         await asyncio.gather(*(hook() for hook in self._post_unload_hooks))
         self.logger.info(f"Successfully unloaded plugin `{self.metadata.name}`")
