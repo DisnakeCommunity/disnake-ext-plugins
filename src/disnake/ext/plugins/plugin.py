@@ -87,7 +87,12 @@ class PluginMetadata:
 
 
 def _get_source_module_name() -> str:
-    module_name = pathlib.Path(logging.currentframe().f_code.co_filename).stem
+    frame = logging.currentframe()
+    if (fp := frame.f_code.co_filename).endswith("typing.py"):  # typevar specified
+        if frame.f_back:
+            fp = frame.f_back.f_code.co_filename
+
+    module_name = pathlib.Path(fp).stem
     LOGGER.debug(f"Module name resolved to {module_name!r}")
     return module_name
 
