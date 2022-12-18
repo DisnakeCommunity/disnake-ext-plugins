@@ -133,9 +133,9 @@ class Plugin(t.Generic[BotT]):
     """
 
     __slots__ = (
-        "bot",
         "metadata",
         "logger",
+        "_bot",
         "_commands",
         "_slash_commands",
         "_message_commands",
@@ -147,11 +147,6 @@ class Plugin(t.Generic[BotT]):
         "_pre_unload_hooks",
         "_post_unload_hooks",
     )
-
-    bot: BotT
-    """The bot on which this plugin is registered. This will only be available
-    after calling :meth:`.load`.
-    """
 
     metadata: PluginMetadata
     """The metadata assigned to the plugin."""
@@ -233,6 +228,8 @@ class Plugin(t.Generic[BotT]):
         self._pre_unload_hooks: t.MutableSequence[EmptyAsync] = []
         self._post_unload_hooks: t.MutableSequence[EmptyAsync] = []
 
+        self._bot: t.Optional[BotT] = None
+
     @classmethod
     def with_metadata(cls, metadata: PluginMetadata) -> Self:
         """Create a Plugin with pre-existing metadata.
@@ -251,6 +248,15 @@ class Plugin(t.Generic[BotT]):
         self = cls()
         self.metadata = metadata
         return self
+
+    @property
+    def bot(self) -> BotT:
+        """The bot on which this plugin is registered. This will only be available
+        after calling :meth:`.load`.
+        """
+        if not self._bot:
+            raise RuntimeError("Cannot access the bot on a plugin that has not yet been loaded.")
+        return self._bot
 
     @property
     def name(self) -> str:
@@ -683,7 +689,7 @@ class Plugin(t.Generic[BotT]):
         bot: Union[:class:`commands.Bot`, :class:`commands.InteractionBot`]
             The bot on which to register the plugin's commands.
         """
-        self.bot = bot
+        self._bot = bot
 
         await asyncio.gather(*(hook() for hook in self._pre_load_hooks))
 
@@ -708,6 +714,9 @@ class Plugin(t.Generic[BotT]):
             loop.start()
 
         await asyncio.gather(*(hook() for hook in self._post_load_hooks))
+
+        bot._schedule_delayed_command_sync()
+
         self.logger.info(f"Successfully loaded plugin `{self.metadata.name}`")
 
     async def unload(self, bot: BotT) -> None:
@@ -741,6 +750,9 @@ class Plugin(t.Generic[BotT]):
             loop.cancel()
 
         await asyncio.gather(*(hook() for hook in self._post_unload_hooks))
+
+        bot._schedule_delayed_command_sync()
+
         self.logger.info(f"Successfully unloaded plugin `{self.metadata.name}`")
 
     def load_hook(self, post: bool = False) -> t.Callable[[EmptyAsync], EmptyAsync]:
