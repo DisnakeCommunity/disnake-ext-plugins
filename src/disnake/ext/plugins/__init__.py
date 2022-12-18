@@ -7,7 +7,7 @@ not reliant on inheritance.
 :license: MIT, see LICENSE for more details.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.1"
 
 
 from .plugin import Plugin
