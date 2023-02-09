@@ -1,7 +1,6 @@
 import disnake
 from disnake.ext import commands, plugins
 
-
 Context = commands.Context[commands.Bot]
 
 
@@ -11,6 +10,7 @@ plugin = plugins.Plugin()
 
 
 # First, we define a local check...
+
 
 async def local_check(ctx: Context):
     # Check if the message was sent in a channel with "foo" in its name...
