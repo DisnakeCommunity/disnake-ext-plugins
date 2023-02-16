@@ -40,6 +40,7 @@ BotT = t.TypeVar(
 )
 
 Coro = t.Coroutine[t.Any, t.Any, T]
+MaybeCoro = t.Union[Coro[T], T]
 EmptyAsync = t.Callable[[], Coro[None]]
 SetupFunc = t.Callable[[BotT], None]
 
@@ -54,6 +55,16 @@ LocalizedOptional = t.Union[t.Optional[str], disnake.Localized[t.Optional[str]]]
 PermissionsOptional = t.Optional[t.Union[disnake.Permissions, int]]
 
 LoopT = t.TypeVar("LoopT", bound="tasks.Loop[t.Any]")
+
+PrefixCommandCheck = t.Callable[[commands.Context[t.Any]], MaybeCoro[bool]]
+AppCommandCheck = t.Callable[[disnake.CommandInteraction], MaybeCoro[bool]]
+
+PrefixCommandCheckT = t.TypeVar("PrefixCommandCheckT", bound=PrefixCommandCheck)
+AppCommandCheckT = t.TypeVar("AppCommandCheckT", bound=AppCommandCheck)
+
+
+class CheckAware(t.Protocol):
+    checks: t.List[t.Callable[..., MaybeCoro[bool]]]
 
 
 class CommandParams(t.TypedDict, total=False):
@@ -139,9 +150,13 @@ class Plugin(t.Generic[BotT]):
         "_commands",
         "_slash_commands",
         "_message_commands",
+        "_user_commands",
+        "_command_checks",
+        "_slash_command_checks",
+        "_message_command_checks",
+        "_user_command_checks",
         "_listeners",
         "_loops",
-        "_user_commands",
         "_pre_load_hooks",
         "_post_load_hooks",
         "_pre_unload_hooks",
@@ -215,6 +230,11 @@ class Plugin(t.Generic[BotT]):
         self._message_commands: t.Dict[str, commands.InvokableMessageCommand] = {}
         self._slash_commands: t.Dict[str, commands.InvokableSlashCommand] = {}
         self._user_commands: t.Dict[str, commands.InvokableUserCommand] = {}
+
+        self._command_checks: t.MutableSequence[PrefixCommandCheck] = []
+        self._slash_command_checks: t.MutableSequence[AppCommandCheck] = []
+        self._message_command_checks: t.MutableSequence[AppCommandCheck] = []
+        self._user_command_checks: t.MutableSequence[AppCommandCheck] = []
 
         self._listeners: t.Dict[str, t.MutableSequence[CoroFunc]] = {}
         self._loops: t.List[tasks.Loop[t.Any]] = []
@@ -614,6 +634,24 @@ class Plugin(t.Generic[BotT]):
 
         return decorator
 
+    # Checks
+
+    def command_check(self, predicate: PrefixCommandCheckT) -> PrefixCommandCheckT:
+        self._command_checks.append(predicate)
+        return predicate
+
+    def slash_command_check(self, predicate: AppCommandCheckT) -> AppCommandCheckT:
+        self._slash_command_checks.append(predicate)
+        return predicate
+
+    def message_command_check(self, predicate: AppCommandCheckT) -> AppCommandCheckT:
+        self._message_command_checks.append(predicate)
+        return predicate
+
+    def user_command_check(self, predicate: AppCommandCheckT) -> AppCommandCheckT:
+        self._user_command_checks.append(predicate)
+        return predicate
+
     # Listeners
 
     def add_listeners(self, *callbacks: CoroFunc, event: t.Optional[str] = None) -> None:
@@ -681,6 +719,19 @@ class Plugin(t.Generic[BotT]):
 
     # Plugin (un)loading...
 
+    @staticmethod
+    def _prepend_plugin_checks(
+        checks: t.Sequence[t.Union[PrefixCommandCheck, AppCommandCheck]],
+        command: CheckAware,
+    ) -> None:
+        """Internal method to handle updating checks with plugin-wide checks.
+
+        To remain consistent with the behaviour of e.g. commands.Cog.cog_check,
+        plugin-wide checks are **prepended** to the commands' local checks.
+        """
+        if checks:
+            command.checks = [*checks, *command.checks]
+
     async def load(self, bot: BotT) -> None:
         """Registers commands to the bot and runs pre- and post-load hooks.
 
@@ -696,15 +747,19 @@ class Plugin(t.Generic[BotT]):
         if isinstance(bot, commands.BotBase):
             for command in self._commands.values():
                 bot.add_command(command)  # type: ignore
+                self._prepend_plugin_checks(self._command_checks, command)
 
         for command in self._slash_commands.values():
             bot.add_slash_command(command)
+            self._prepend_plugin_checks(self._slash_command_checks, command)
 
         for command in self._user_commands.values():
             bot.add_user_command(command)
+            self._prepend_plugin_checks(self._user_command_checks, command)
 
         for command in self._message_commands.values():
             bot.add_message_command(command)
+            self._prepend_plugin_checks(self._message_command_checks, command)
 
         for event, listeners in self._listeners.items():
             for listener in listeners:
