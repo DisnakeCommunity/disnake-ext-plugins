@@ -165,7 +165,7 @@ class Plugin(t.Generic[BotT]):
         slash_command_attrs: t.Optional[SlashCommandParams] = None,
         user_command_attrs: t.Optional[AppCommandParams] = None,
         logger: t.Union[logging.Logger, str, None] = None,
-    ):
+    ) -> None:
         ...
 
     @t.overload
@@ -179,7 +179,7 @@ class Plugin(t.Generic[BotT]):
         slash_command_attrs: t.Optional[SlashCommandParams] = None,
         user_command_attrs: t.Optional[AppCommandParams] = None,
         logger: t.Union[logging.Logger, str, None] = None,
-    ):
+    ) -> None:
         ...
 
     def __init__(
@@ -192,7 +192,7 @@ class Plugin(t.Generic[BotT]):
         slash_command_attrs: t.Optional[SlashCommandParams] = None,
         user_command_attrs: t.Optional[AppCommandParams] = None,
         logger: t.Union[logging.Logger, str, None] = None,
-    ):
+    ) -> None:
         self.metadata: PluginMetadata = PluginMetadata(
             name=name or _get_source_module_name(),
             category=category,
