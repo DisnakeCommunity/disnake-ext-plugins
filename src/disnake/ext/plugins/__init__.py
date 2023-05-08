@@ -10,6 +10,4 @@ not reliant on inheritance.
 __version__ = "0.2.1"
 
 
-from .plugin import Plugin
-
-__all__ = ("Plugin",)
+from .plugin import *

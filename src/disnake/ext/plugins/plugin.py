@@ -16,7 +16,7 @@ if t.TYPE_CHECKING:
     from disnake.ext import tasks
 
 
-__all__ = ("Plugin",)
+__all__ = ("Plugin", "get_parent_plugin")
 
 LOGGER = logging.getLogger(__name__)
 
@@ -29,15 +29,15 @@ if sys.version_info <= (3, 9):
 else:
     P = t.ParamSpec("P")
 
-BotT = t.TypeVar(
-    "BotT",
-    bound=t.Union[
-        commands.Bot,
-        commands.AutoShardedBot,
-        commands.InteractionBot,
-        commands.AutoShardedInteractionBot,
-    ],
-)
+
+AnyBot = t.Union[
+    commands.Bot,
+    commands.AutoShardedBot,
+    commands.InteractionBot,
+    commands.AutoShardedInteractionBot,
+]
+
+BotT = t.TypeVar("BotT", bound=AnyBot)
 
 Coro = t.Coroutine[t.Any, t.Any, T]
 EmptyAsync = t.Callable[[], Coro[None]]
@@ -90,6 +90,17 @@ class PluginMetadata:
     slash_command_attrs: SlashCommandParams = dataclasses.field(default_factory=SlashCommandParams)
     message_command_attrs: AppCommandParams = dataclasses.field(default_factory=AppCommandParams)
     user_command_attrs: AppCommandParams = dataclasses.field(default_factory=AppCommandParams)
+
+
+class ExtrasAware(t.Protocol):
+    extras: t.Dict[str, t.Any]
+
+
+def get_parent_plugin(obj: ExtrasAware) -> Plugin[AnyBot]:
+    if plugin := obj.extras.get("plugin"):
+        return plugin
+
+    raise LookupError(f"Object {type(obj).__name__!r} does not belong to a Plugin.")
 
 
 def _get_source_module_name() -> str:
@@ -294,7 +305,12 @@ class Plugin(t.Generic[BotT]):
 
     def _apply_attrs(self, attrs: t.Mapping[str, t.Any], **kwargs: t.Any) -> t.Dict[str, t.Any]:
         new_attrs = {**attrs, **{k: v for k, v in kwargs.items() if v is not None}}
-        new_attrs.setdefault("extras", {})["metadata"] = self.metadata
+
+        # Ensure keys are set, but don't override any in case they are already in use.
+        extras = new_attrs.setdefault("extras", {})
+        extras.setdefault("plugin", self)
+        extras.setdefault("metadata", self.metadata)  # Backward compatibility, may remove later.
+
         return new_attrs
 
     # Prefix commands
