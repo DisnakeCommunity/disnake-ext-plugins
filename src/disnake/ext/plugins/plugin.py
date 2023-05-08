@@ -109,9 +109,9 @@ class ExtrasAware(t.Protocol):
 
 def get_parent_plugin(obj: ExtrasAware) -> Plugin[AnyBot]:
     """Get the plugin to which the provided object is registered.
-    
+
     This only works with objects that support an ``extras`` attribute.
-    
+
     Parameters
     ----------
     obj: ExtrasAware
