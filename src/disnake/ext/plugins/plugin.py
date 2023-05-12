@@ -95,7 +95,6 @@ class SlashCommandParams(AppCommandParams, total=False):
 @dataclasses.dataclass
 class PluginMetadata:
     name: str
-    category: t.Optional[str] = None
 
     command_attrs: CommandParams = dataclasses.field(default_factory=CommandParams)
     slash_command_attrs: SlashCommandParams = dataclasses.field(default_factory=SlashCommandParams)
@@ -172,11 +171,14 @@ class Plugin(t.Generic[BotT]):
     logger: Optional[Union[:class:`logging.Logger`, :class:`str`]]
         The logger or its name to use when logging plugin events.
         If not specified, defaults to `disnake.ext.plugins.plugin`.
+    extras: Dict[:class:`str`, Any]
+        A dict of extra values for this plugin.
     """
 
     __slots__ = (
         "metadata",
         "logger",
+        "extras",
         "_bot",
         "_commands",
         "_slash_commands",
@@ -200,17 +202,20 @@ class Plugin(t.Generic[BotT]):
     logger: logging.Logger
     """The logger associated with this plugin."""
 
+    extras: t.Dict[str, t.Any]
+    """A dict of extra values for this plugin."""
+
     @t.overload
     def __init__(
         self: Plugin[commands.Bot],
         *,
         name: t.Optional[str] = None,
-        category: t.Optional[str] = None,
         command_attrs: t.Optional[CommandParams] = None,
         message_command_attrs: t.Optional[AppCommandParams] = None,
         slash_command_attrs: t.Optional[SlashCommandParams] = None,
         user_command_attrs: t.Optional[AppCommandParams] = None,
         logger: t.Union[logging.Logger, str, None] = None,
+        **kwargs: t.Any,
     ) -> None:
         ...
 
@@ -219,12 +224,12 @@ class Plugin(t.Generic[BotT]):
         self,
         *,
         name: t.Optional[str] = None,
-        category: t.Optional[str] = None,
         command_attrs: t.Optional[CommandParams] = None,
         message_command_attrs: t.Optional[AppCommandParams] = None,
         slash_command_attrs: t.Optional[SlashCommandParams] = None,
         user_command_attrs: t.Optional[AppCommandParams] = None,
         logger: t.Union[logging.Logger, str, None] = None,
+        **kwargs: t.Any,
     ) -> None:
         ...
 
@@ -232,16 +237,15 @@ class Plugin(t.Generic[BotT]):
         self,
         *,
         name: t.Optional[str] = None,
-        category: t.Optional[str] = None,
         command_attrs: t.Optional[CommandParams] = None,
         message_command_attrs: t.Optional[AppCommandParams] = None,
         slash_command_attrs: t.Optional[SlashCommandParams] = None,
         user_command_attrs: t.Optional[AppCommandParams] = None,
         logger: t.Union[logging.Logger, str, None] = None,
+        **kwargs: t.Any,
     ) -> None:
         self.metadata: PluginMetadata = PluginMetadata(
             name=name or _get_source_module_name(),
-            category=category,
             command_attrs=command_attrs or {},
             message_command_attrs=message_command_attrs or {},
             slash_command_attrs=slash_command_attrs or {},
@@ -256,6 +260,8 @@ class Plugin(t.Generic[BotT]):
             logger = LOGGER
 
         self.logger = logger
+
+        self.extras = kwargs
 
         self._commands: t.Dict[str, commands.Command[Self, t.Any, t.Any]] = {}  # type: ignore
         self._message_commands: t.Dict[str, commands.InvokableMessageCommand] = {}
@@ -313,11 +319,6 @@ class Plugin(t.Generic[BotT]):
     def name(self) -> str:
         """The name of this plugin."""
         return self.metadata.name
-
-    @property
-    def category(self) -> t.Optional[str]:
-        """The category this plugin belongs to."""
-        return self.metadata.category
 
     @property
     def commands(self) -> t.Sequence[commands.Command[Self, t.Any, t.Any]]:  # type: ignore
