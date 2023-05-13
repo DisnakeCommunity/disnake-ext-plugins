@@ -10,11 +10,7 @@ import typing as t
 from typing_extensions import Self
 
 import disnake
-from disnake.ext import commands
-
-if t.TYPE_CHECKING:
-    from disnake.ext import tasks
-
+from disnake.ext import commands, tasks
 
 __all__ = ("Plugin", "get_parent_plugin")
 
@@ -750,6 +746,32 @@ class Plugin(t.Generic[BotT]):
 
             self._loops.append(loop)
             return loop
+
+        return decorator
+
+    def loop(
+        self, *, wait_until_ready: bool = True, **loop_args: t.Any
+    ) -> t.Callable[[CoroFuncT], tasks.Loop[CoroFuncT]]:
+        """
+        Shortcut decorator for :func:`disnake.ext.tasks.loop` + :meth:`Plugin.register_loop`.
+        Parameters
+        ----------
+        wait_until_ready: :class:`bool`
+            Whether or not to add a simple `loop.before_loop` callback that waits
+            until the bot is ready. This can be handy if you load plugins before
+            you start the bot (which you should!) and make api requests with a
+            loop.
+            .. warn::
+                This only works if the loop does not already have a `before_loop`
+                callback registered.
+        **kwargs:
+            Keyword arguments to pass to :func:`disnake.ext.tasks.loop`.
+        """
+
+        def decorator(coro: CoroFuncT) -> tasks.Loop[CoroFuncT]:
+            f = tasks.loop(**loop_args)(coro)
+            self.register_loop(wait_until_ready=wait_until_ready)(f)
+            return f
 
         return decorator
 
