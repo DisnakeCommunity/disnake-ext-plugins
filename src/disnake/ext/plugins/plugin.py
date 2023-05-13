@@ -722,6 +722,7 @@ class Plugin(t.Generic[BotT]):
     def register_loop(self, *, wait_until_ready: bool = False) -> t.Callable[[LoopT], LoopT]:
         """A decorator that registers a loop to be automatically started and
         stopped along with the plugin being loaded and unloaded.
+
         Parameters
         ----------
         wait_until_ready: :class:`bool`
@@ -754,6 +755,7 @@ class Plugin(t.Generic[BotT]):
     ) -> t.Callable[[CoroFuncT], tasks.Loop[CoroFuncT]]:
         """
         Shortcut decorator for :func:`disnake.ext.tasks.loop` + :meth:`Plugin.register_loop`.
+
         Parameters
         ----------
         wait_until_ready: :class:`bool`
