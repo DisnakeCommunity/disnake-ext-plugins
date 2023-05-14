@@ -10,7 +10,10 @@ import typing as t
 from typing_extensions import Self
 
 import disnake
-from disnake.ext import commands, tasks
+from disnake.ext import commands
+
+if t.TYPE_CHECKING:
+    from disnake.ext import tasks
 
 __all__ = ("Plugin", "get_parent_plugin")
 
@@ -758,17 +761,62 @@ class Plugin(t.Generic[BotT]):
 
         Parameters
         ----------
+        cls: Type[:class:`Loop`]
+            The loop subclass to create an instance of. If provided, the following parameters
+            described below do not apply. Instead, this decorator will accept the same keywords
+            as the passed cls does. This argument is passed to :func:`disnake.ext.tasks.loop`.
+
+            .. versionadded:: 2.6
+        seconds: :class:`float`
+            The number of seconds between every iteration. This argument is passed to :func:`disnake.ext.tasks.loop`.
+        minutes: :class:`float`
+            The number of minutes between every iteration. This argument is passed to :func:`disnake.ext.tasks.loop`.
+        hours: :class:`float`
+            The number of hours between every iteration. This argument is passed to :func:`disnake.ext.tasks.loop`.
+        time: Union[:class:`datetime.time`, Sequence[:class:`datetime.time`]]
+            The exact times to run this loop at. Either a non-empty list or a single
+            value of :class:`datetime.time` should be passed. Timezones are supported.
+            If no timezone is given for the times, it is assumed to represent UTC time.
+
+            This cannot be used in conjunction with the relative time parameters.
+
+            This argument is passed to :func:`disnake.ext.tasks.loop`.
+
+            .. note::
+
+                Duplicate times will be ignored, and only run once.
+
+            .. versionadded:: 2.0
+        count: Optional[:class:`int`]
+            The number of loops to do, ``None`` if it should be an
+            infinite loop. This argument is passed to :func:`disnake.ext.tasks.loop`.
+        reconnect: :class:`bool`
+            Whether to handle errors and restart the task
+            using an exponential back-off algorithm similar to the
+            one used in :meth:`disnake.Client.connect`. This argument is passed to :func:`disnake.ext.tasks.loop`.
+        loop: :class:`asyncio.AbstractEventLoop`
+            The loop to use to register the task, if not given
+            defaults to :func:`asyncio.get_event_loop`. This argument is passed to :func:`disnake.ext.tasks.loop`.
         wait_until_ready: :class:`bool`
             Whether or not to add a simple `loop.before_loop` callback that waits
             until the bot is ready. This can be handy if you load plugins before
             you start the bot (which you should!) and make api requests with a
-            loop.
+            loop. This argument is passed to :meth:`Plugin.register_loop`.
+
             .. warn::
                 This only works if the loop does not already have a `before_loop`
                 callback registered.
-        **kwargs:
-            Keyword arguments to pass to :func:`disnake.ext.tasks.loop`.
+
+        Raises
+        ------
+        ValueError
+            An invalid value was given.
+        TypeError
+            The function was not a coroutine, the ``cls`` parameter was not a subclass of ``Loop``,
+            an invalid value for the ``time`` parameter was passed,
+            or ``time`` parameter was passed in conjunction with relative time parameters.
         """
+        from disnake.ext import tasks
 
         def decorator(coro: CoroFuncT) -> tasks.Loop[CoroFuncT]:
             f = tasks.loop(**loop_args)(coro)
