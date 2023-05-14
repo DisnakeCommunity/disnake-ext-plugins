@@ -7,12 +7,15 @@ import pathlib
 import sys
 import typing as t
 
+from disnake.utils import MISSING
 from typing_extensions import Self
 
 import disnake
 from disnake.ext import commands
 
 if t.TYPE_CHECKING:
+    import datetime
+
     from disnake.ext import tasks
 
 __all__ = ("Plugin", "get_parent_plugin")
@@ -754,7 +757,17 @@ class Plugin(t.Generic[BotT]):
         return decorator
 
     def loop(
-        self, *, wait_until_ready: bool = True, **loop_args: t.Any
+        self,
+        *,
+        cls: t.Type[tasks.Loop[CoroFuncT]],
+        seconds: float = 0.0,
+        minutes: float = 0.0,
+        hours: float = 0.0,
+        time: t.Union[datetime.time, t.Sequence[datetime.time]] = MISSING,
+        count: t.Optional[int] = None,
+        reconnect: bool = True,
+        loop: asyncio.AbstractEventLoop = MISSING,
+        wait_until_ready: bool = True,
     ) -> t.Callable[[CoroFuncT], tasks.Loop[CoroFuncT]]:
         """
         Shortcut decorator for :func:`disnake.ext.tasks.loop` + :meth:`Plugin.register_loop`.
@@ -768,11 +781,14 @@ class Plugin(t.Generic[BotT]):
 
             .. versionadded:: 2.6
         seconds: :class:`float`
-            The number of seconds between every iteration. This argument is passed to :func:`disnake.ext.tasks.loop`.
+            The number of seconds between every iteration.
+            This argument is passed to :func:`disnake.ext.tasks.loop`.
         minutes: :class:`float`
-            The number of minutes between every iteration. This argument is passed to :func:`disnake.ext.tasks.loop`.
+            The number of minutes between every iteration.
+            This argument is passed to :func:`disnake.ext.tasks.loop`.
         hours: :class:`float`
-            The number of hours between every iteration. This argument is passed to :func:`disnake.ext.tasks.loop`.
+            The number of hours between every iteration.
+            This argument is passed to :func:`disnake.ext.tasks.loop`.
         time: Union[:class:`datetime.time`, Sequence[:class:`datetime.time`]]
             The exact times to run this loop at. Either a non-empty list or a single
             value of :class:`datetime.time` should be passed. Timezones are supported.
@@ -793,10 +809,12 @@ class Plugin(t.Generic[BotT]):
         reconnect: :class:`bool`
             Whether to handle errors and restart the task
             using an exponential back-off algorithm similar to the
-            one used in :meth:`disnake.Client.connect`. This argument is passed to :func:`disnake.ext.tasks.loop`.
+            one used in :meth:`disnake.Client.connect`.
+            This argument is passed to :func:`disnake.ext.tasks.loop`.
         loop: :class:`asyncio.AbstractEventLoop`
             The loop to use to register the task, if not given
-            defaults to :func:`asyncio.get_event_loop`. This argument is passed to :func:`disnake.ext.tasks.loop`.
+            defaults to :func:`asyncio.get_event_loop`.
+            This argument is passed to :func:`disnake.ext.tasks.loop`.
         wait_until_ready: :class:`bool`
             Whether or not to add a simple `loop.before_loop` callback that waits
             until the bot is ready. This can be handy if you load plugins before
@@ -819,7 +837,16 @@ class Plugin(t.Generic[BotT]):
         from disnake.ext import tasks
 
         def decorator(coro: CoroFuncT) -> tasks.Loop[CoroFuncT]:
-            f = tasks.loop(**loop_args)(coro)
+            f = tasks.loop(
+                cls=cls,
+                seconds=seconds,
+                minutes=minutes,
+                hours=hours,
+                time=time,
+                count=count,
+                reconnect=reconnect,
+                loop=loop,
+            )(coro)
             self.register_loop(wait_until_ready=wait_until_ready)(f)
             return f
 
