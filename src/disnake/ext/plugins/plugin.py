@@ -171,7 +171,7 @@ class Plugin(t.Generic[BotT]):
     logger: Optional[Union[:class:`logging.Logger`, :class:`str`]]
         The logger or its name to use when logging plugin events.
         If not specified, defaults to `disnake.ext.plugins.plugin`.
-    extras: Dict[:class:`str`, Any]
+    **extras: Dict[:class:`str`, Any]
         A dict of extra values for this plugin.
     """
 
@@ -215,7 +215,7 @@ class Plugin(t.Generic[BotT]):
         slash_command_attrs: t.Optional[SlashCommandParams] = None,
         user_command_attrs: t.Optional[AppCommandParams] = None,
         logger: t.Union[logging.Logger, str, None] = None,
-        **kwargs: t.Any,
+        **extras: t.Any,
     ) -> None:
         ...
 
@@ -229,7 +229,7 @@ class Plugin(t.Generic[BotT]):
         slash_command_attrs: t.Optional[SlashCommandParams] = None,
         user_command_attrs: t.Optional[AppCommandParams] = None,
         logger: t.Union[logging.Logger, str, None] = None,
-        **kwargs: t.Any,
+        **extras: t.Any,
     ) -> None:
         ...
 
@@ -242,7 +242,7 @@ class Plugin(t.Generic[BotT]):
         slash_command_attrs: t.Optional[SlashCommandParams] = None,
         user_command_attrs: t.Optional[AppCommandParams] = None,
         logger: t.Union[logging.Logger, str, None] = None,
-        **kwargs: t.Any,
+        **extras: t.Any,
     ) -> None:
         self.metadata: PluginMetadata = PluginMetadata(
             name=name or _get_source_module_name(),
@@ -261,7 +261,7 @@ class Plugin(t.Generic[BotT]):
 
         self.logger = logger
 
-        self.extras = kwargs
+        self.extras = extras
 
         self._commands: t.Dict[str, commands.Command[Self, t.Any, t.Any]] = {}  # type: ignore
         self._message_commands: t.Dict[str, commands.InvokableMessageCommand] = {}
