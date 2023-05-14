@@ -95,13 +95,40 @@ class SlashCommandParams(AppCommandParams, total=False):
 
 @dataclasses.dataclass
 class PluginMetadata:
+    """Represents metadata for a :class:`Plugin`
+
+    Parameters
+    ----------
+    name: :class:`str`
+        Plugin's name.
+    category: Optional[:class:`str`]
+        The category this plugin belongs to. Does not serve any actual purpose,
+        but may be useful in organising plugins.
+
+        .. deprecated:: 0.2.3
+            Use :attr:`Plugin.extras` instead.
+    command_attrs: CommandParams
+        Parameters to apply to each prefix command in this plugin.
+    slash_command_attrs: SlashCommandParams
+        Parameters to apply to each slash command in this plugin.
+    message_command_attrs: AppCommandParams
+        Parameters to apply to each message command in this plugin.
+    user_command_attrs: AppCommandParams
+        Parameters to apply to each user command in this plugin.
+    """
+
     name: str
+    """Plugin's name"""
     category: dataclasses.InitVar[t.Optional[str]] = None  # type: ignore
 
     command_attrs: CommandParams = dataclasses.field(default_factory=CommandParams)
+    """Parameters to apply to each prefix command in this plugin."""
     slash_command_attrs: SlashCommandParams = dataclasses.field(default_factory=SlashCommandParams)
+    """Parameters to apply to each slash command in this plugin."""
     message_command_attrs: AppCommandParams = dataclasses.field(default_factory=AppCommandParams)
+    """Parameters to apply to each message command in this plugin."""
     user_command_attrs: AppCommandParams = dataclasses.field(default_factory=AppCommandParams)
+    """Parameters to apply to each user command in this plugin."""
 
     _category: t.Optional[str] = dataclasses.field(default=None, repr=False, init=False)
 
@@ -116,6 +143,12 @@ class PluginMetadata:
 
     @property
     def category(self) -> t.Optional[str]:
+        """The category this plugin belongs to. Does not serve any actual purpose,
+        but may be useful in organising plugins.
+
+        .. deprecated:: 0.2.3
+            Use :attr:`Plugin.extras` instead.
+        """
         warnings.warn(
             "Accessing `PluginMetadata.category` is deprecated. Use `Plugin.extras` instead.",
             DeprecationWarning,
