@@ -292,7 +292,11 @@ class Plugin(t.Generic[BotT]):
                 "Passing `category` to `Plugin` is deprecated. Use `extras` instead.",
                 DeprecationWarning,
             )
-            self.metadata._category = category
+
+            # Customized warning message above
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                self.metadata.category = category  # type: ignore
 
         if logger is not None:
             if isinstance(logger, str):
