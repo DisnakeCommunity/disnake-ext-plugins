@@ -1,5 +1,3 @@
-import asyncio
-
 from disnake.ext import commands
 
 # Since plugin loading supports asynchronous hooks, it needs to be done slightly
@@ -7,6 +5,8 @@ from disnake.ext import commands
 # Basically, we need to have a running loop by the time we load plugins. The
 # easiest way to achieve this is through an async main function. To this end,
 # we use asyncio to run the function.
+
+import asyncio
 
 
 async def main():
