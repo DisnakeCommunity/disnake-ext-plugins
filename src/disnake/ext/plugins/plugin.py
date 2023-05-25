@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import logging
-import pathlib
 import sys
 import typing as t
 
@@ -19,6 +18,7 @@ if t.TYPE_CHECKING:
 __all__ = ("Plugin", "get_parent_plugin")
 
 LOGGER = logging.getLogger(__name__)
+_INVALID: t.Final[t.Sequence[str]] = (t.__file__, __file__)
 
 T = t.TypeVar("T")
 
@@ -152,17 +152,17 @@ def _get_source_module_name() -> str:
     #   will be encountered before the target module.
     # - this file; we don't want to just return "plugin" if possible.
     frame = tb.tb_frame
-    invalid = (t.__file__, __file__)
     while frame := frame.f_back:
-        fp = frame.f_code.co_filename
+        if frame.f_code.co_filename not in _INVALID:
+            break
 
-        if fp not in invalid:
-            module_name = pathlib.Path(fp).stem
-            LOGGER.debug("Module name resolved to %r", module_name)
-            return module_name
+    else:
+        LOGGER.warning("Failed to infer file name, defaulting to 'plugin'.")
+        return "plugin"
 
-    LOGGER.warning("Failed to infer file name, defaulting to 'plugin'.")
-    return "plugin"
+    module_name = frame.f_locals["__name__"]
+    LOGGER.debug("Module name resolved to %r", module_name)
+    return module_name
 
 
 class Plugin(t.Generic[BotT]):
