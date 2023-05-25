@@ -135,14 +135,34 @@ def get_parent_plugin(obj: ExtrasAware) -> Plugin[AnyBot]:
 
 
 def _get_source_module_name() -> str:
-    frame = logging.currentframe()
-    if (fp := frame.f_code.co_filename).endswith("typing.py"):  # typevar specified
-        if frame.f_back:
-            fp = frame.f_back.f_code.co_filename
+    # Get current frame from exception traceback...
+    try:
+        raise Exception
+    except Exception as exc:
+        tb = exc.__traceback__
 
-    module_name = pathlib.Path(fp).stem
-    LOGGER.debug(f"Module name resolved to {module_name!r}")
-    return module_name
+    if not tb:
+        # No traceback, therefore can't access frames and infer plugin name...
+        LOGGER.warning("Failed to infer file name, defaulting to 'plugin'.")
+        return "plugin"
+
+    # Navigate all frames for one with a valid path.
+    # Note that we explicitly filter out:
+    # - the stdlib typing module; if the generic parameter is specified, this
+    #   will be encountered before the target module.
+    # - this file; we don't want to just return "plugin" if possible.
+    frame = tb.tb_frame
+    invalid = (t.__file__, __file__)
+    while frame := frame.f_back:
+        fp = frame.f_code.co_filename
+
+        if fp not in invalid:
+            module_name = pathlib.Path(fp).stem
+            LOGGER.debug("Module name resolved to %r", module_name)
+            return module_name
+
+    LOGGER.warning("Failed to infer file name, defaulting to 'plugin'.")
+    return "plugin"
 
 
 class Plugin(t.Generic[BotT]):
