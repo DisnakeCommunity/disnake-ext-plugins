@@ -105,7 +105,7 @@ class PluginMetadata:
         The category this plugin belongs to. Does not serve any actual purpose,
         but may be useful in organising plugins.
 
-        .. deprecated:: 0.2.3
+        .. deprecated:: 0.2.4
             Use :attr:`Plugin.extras` instead.
     command_attrs: CommandParams
         Parameters to apply to each prefix command in this plugin.
@@ -146,7 +146,7 @@ class PluginMetadata:
         """The category this plugin belongs to. Does not serve any actual purpose,
         but may be useful in organising plugins.
 
-        .. deprecated:: 0.2.3
+        .. deprecated:: 0.2.4
             Use :attr:`Plugin.extras` instead.
         """
         warnings.warn(
@@ -223,7 +223,7 @@ class Plugin(t.Generic[BotT]):
         The category this plugin belongs to. Does not serve any actual purpose,
         but may be useful in organising plugins.
 
-        .. deprecated:: 0.2.3
+        .. deprecated:: 0.2.4
             Use :attr:`Plugin.extras` instead.
     command_attrs: Dict[:class:`str`, Any]
         A dict of parameters to apply to each prefix command in this plugin.
@@ -403,7 +403,7 @@ class Plugin(t.Generic[BotT]):
     def category(self) -> t.Optional[str]:
         """The category this plugin belongs to.
 
-        .. deprecated:: 0.2.3
+        .. deprecated:: 0.2.4
             Use :attr:`Plugin.extras` instead.
         """
         warnings.warn(
