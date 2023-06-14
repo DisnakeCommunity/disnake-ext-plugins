@@ -144,7 +144,8 @@ class PluginMetadata:
             Use :attr:`.extras` instead.
         """
         warnings.warn(
-            "Accessing `PluginMetadata.category` is deprecated. Use `PluginMetadata.extras` instead.",
+            "Accessing `PluginMetadata.category` is deprecated. "
+            "Use `PluginMetadata.extras` instead.",
             DeprecationWarning,
         )
         return self.extras.get("category")
@@ -418,11 +419,11 @@ class Plugin(t.Generic[BotT]):
         )
 
         return self.extras.get("category")
-    
+
     @property
     def extras(self) -> t.Dict[str, t.Any]:
         """A dict of extra metadata for this plugin.
-        
+
         .. versionadded:: 0.2.4
         """
         return self.metadata.extras
