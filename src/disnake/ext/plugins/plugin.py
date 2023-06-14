@@ -106,7 +106,11 @@ class PluginMetadata:
         but may be useful in organising plugins.
 
         .. deprecated:: 0.2.4
-            Use :attr:`Plugin.extras` instead.
+            Use :attr:`.extras` instead.
+    extras: Dict[:class:`str`, :class:`str`]
+        A dict of extra metadata for a plugin.
+
+        .. versionadded:: 0.2.4
     command_attrs: CommandParams
         Parameters to apply to each prefix command in this plugin.
     slash_command_attrs: SlashCommandParams
@@ -119,7 +123,8 @@ class PluginMetadata:
 
     name: str
     """Plugin's name"""
-    category: dataclasses.InitVar[t.Optional[str]] = None  # type: ignore
+    extras: t.Dict[str, t.Any]
+    """A dict of extra metadata for a plugin."""
 
     command_attrs: CommandParams = dataclasses.field(default_factory=CommandParams)
     """Parameters to apply to each prefix command in this plugin."""
@@ -130,17 +135,6 @@ class PluginMetadata:
     user_command_attrs: AppCommandParams = dataclasses.field(default_factory=AppCommandParams)
     """Parameters to apply to each user command in this plugin."""
 
-    _category: t.Optional[str] = dataclasses.field(default=None, repr=False, init=False)
-
-    def __post_init__(self, category_: t.Optional[str]) -> None:  # type: ignore
-        # if category was not passed then it'll be <property object at 0xSOMEHEX>, not None
-        if isinstance(category_, str):
-            warnings.warn(
-                "Passing `category` to `PluginMetadata` is deprecated. "
-                "Use `Plugin.extras` instead.",
-                DeprecationWarning,
-            )
-
     @property
     def category(self) -> t.Optional[str]:
         """The category this plugin belongs to. Does not serve any actual purpose,
@@ -150,18 +144,18 @@ class PluginMetadata:
             Use :attr:`Plugin.extras` instead.
         """
         warnings.warn(
-            "Accessing `PluginMetadata.category` is deprecated. Use `Plugin.extras` instead.",
+            "Accessing `PluginMetadata.category` is deprecated. Use `PluginMetadata.extras` instead.",
             DeprecationWarning,
         )
-        return self._category
+        return self.extras.get("category")
 
     @category.setter
     def category(self, value: t.Optional[str]) -> None:
         warnings.warn(
-            "Setting `PluginMetadata.category` is deprecated. Use `Plugin.extras` instead.",
+            "Setting `PluginMetadata.category` is deprecated. Use `PluginMetadata.extras` instead.",
             DeprecationWarning,
         )
-        self._category = value
+        self.extras["category"] = value
 
 
 class ExtrasAware(t.Protocol):
@@ -224,7 +218,7 @@ class Plugin(t.Generic[BotT]):
         but may be useful in organising plugins.
 
         .. deprecated:: 0.2.4
-            Use :attr:`Plugin.extras` instead.
+            Use ``extras`` instead.
     command_attrs: Dict[:class:`str`, Any]
         A dict of parameters to apply to each prefix command in this plugin.
     message_command_attrs: Dict[:class:`str`, Any]
@@ -237,13 +231,12 @@ class Plugin(t.Generic[BotT]):
         The logger or its name to use when logging plugin events.
         If not specified, defaults to `disnake.ext.plugins.plugin`.
     **extras: Dict[:class:`str`, Any]
-        A dict of extra values for this plugin.
+        A dict of extra metadata for this plugin.
     """
 
     __slots__ = (
         "metadata",
         "logger",
-        "extras",
         "_bot",
         "_commands",
         "_slash_commands",
@@ -266,9 +259,6 @@ class Plugin(t.Generic[BotT]):
 
     logger: logging.Logger
     """The logger associated with this plugin."""
-
-    extras: t.Dict[str, t.Any]
-    """A dict of extra values for this plugin."""
 
     @t.overload
     def __init__(
@@ -318,6 +308,7 @@ class Plugin(t.Generic[BotT]):
             message_command_attrs=message_command_attrs or {},
             slash_command_attrs=slash_command_attrs or {},
             user_command_attrs=user_command_attrs or {},
+            extras=extras,
         )
 
         if category is not None:
@@ -326,10 +317,7 @@ class Plugin(t.Generic[BotT]):
                 DeprecationWarning,
             )
 
-            # Customized warning message above
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                self.metadata.category = category  # type: ignore
+            self.metadata.extras["category"] = category
 
         if logger is not None:
             if isinstance(logger, str):
@@ -339,8 +327,6 @@ class Plugin(t.Generic[BotT]):
             logger = LOGGER
 
         self.logger = logger
-
-        self.extras = extras
 
         self._commands: t.Dict[str, commands.Command[Self, t.Any, t.Any]] = {}  # type: ignore
         self._message_commands: t.Dict[str, commands.InvokableMessageCommand] = {}
@@ -404,16 +390,22 @@ class Plugin(t.Generic[BotT]):
         """The category this plugin belongs to.
 
         .. deprecated:: 0.2.4
-            Use :attr:`Plugin.extras` instead.
+            Use :attr:`.extras` instead.
         """
         warnings.warn(
             "Accessing `Plugin.category` is deprecated. Use `Plugin.extras` instead.",
             DeprecationWarning,
         )
 
-        with warnings.catch_warnings():  # customized warning message above
-            warnings.simplefilter("ignore")
-            return self.metadata.category  # type: ignore
+        return self.extras.get("category")
+    
+    @property
+    def extras(self) -> t.Dict[str, t.Any]:
+        """A dict of extra metadata for this plugin.
+        
+        .. versionadded:: 0.2.4
+        """
+        return self.metadata.extras
 
     @property
     def commands(self) -> t.Sequence[commands.Command[Self, t.Any, t.Any]]:  # type: ignore
