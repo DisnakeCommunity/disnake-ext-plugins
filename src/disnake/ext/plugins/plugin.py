@@ -141,7 +141,7 @@ class PluginMetadata:
         but may be useful in organising plugins.
 
         .. deprecated:: 0.2.4
-            Use :attr:`Plugin.extras` instead.
+            Use :attr:`.extras` instead.
         """
         warnings.warn(
             "Accessing `PluginMetadata.category` is deprecated. Use `PluginMetadata.extras` instead.",
