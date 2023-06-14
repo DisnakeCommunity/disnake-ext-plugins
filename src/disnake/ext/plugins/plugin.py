@@ -95,7 +95,7 @@ class SlashCommandParams(AppCommandParams, total=False):
 
 @dataclasses.dataclass
 class PluginMetadata:
-    """Represents metadata for a :class:`Plugin`
+    """Represents metadata for a :class:`Plugin`.
 
     Parameters
     ----------
@@ -286,7 +286,6 @@ class Plugin(t.Generic[BotT]):
         self: Plugin[commands.Bot],
         *,
         name: t.Optional[str] = None,
-        category: t.Optional[str] = None,
         command_attrs: t.Optional[CommandParams] = None,
         message_command_attrs: t.Optional[AppCommandParams] = None,
         slash_command_attrs: t.Optional[SlashCommandParams] = None,
@@ -301,7 +300,6 @@ class Plugin(t.Generic[BotT]):
         self,
         *,
         name: t.Optional[str] = None,
-        category: t.Optional[str] = None,
         command_attrs: t.Optional[CommandParams] = None,
         message_command_attrs: t.Optional[AppCommandParams] = None,
         slash_command_attrs: t.Optional[SlashCommandParams] = None,
@@ -315,7 +313,6 @@ class Plugin(t.Generic[BotT]):
         self,
         *,
         name: t.Optional[str] = None,
-        category: t.Optional[str] = None,
         command_attrs: t.Optional[CommandParams] = None,
         message_command_attrs: t.Optional[AppCommandParams] = None,
         slash_command_attrs: t.Optional[SlashCommandParams] = None,
@@ -331,14 +328,6 @@ class Plugin(t.Generic[BotT]):
             user_command_attrs=user_command_attrs or {},
             extras=extras,
         )
-
-        if category is not None:
-            warnings.warn(
-                "Passing `category` to `Plugin` is deprecated. Use `extras` instead.",
-                DeprecationWarning,
-            )
-
-            self.metadata.extras["category"] = category
 
         if logger is not None:
             if isinstance(logger, str):
