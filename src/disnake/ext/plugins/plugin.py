@@ -3,9 +3,9 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import logging
-import pathlib
 import sys
 import typing as t
+import warnings
 
 from typing_extensions import Self
 
@@ -16,9 +16,10 @@ if t.TYPE_CHECKING:
     from disnake.ext import tasks
 
 
-__all__ = ("Plugin", "get_parent_plugin")
+__all__ = ("Plugin", "PluginMetadata", "get_parent_plugin")
 
 LOGGER = logging.getLogger(__name__)
+_INVALID: t.Final[t.Sequence[str]] = (t.__file__, __file__)
 
 T = t.TypeVar("T")
 
@@ -94,13 +95,68 @@ class SlashCommandParams(AppCommandParams, total=False):
 
 @dataclasses.dataclass
 class PluginMetadata:
+    """Represents metadata for a :class:`Plugin`.
+
+    Parameters
+    ----------
+    name: :class:`str`
+        Plugin's name.
+    category: Optional[:class:`str`]
+        The category this plugin belongs to. Does not serve any actual purpose,
+        but may be useful in organising plugins.
+
+        .. deprecated:: 0.2.4
+            Use :attr:`.extras` instead.
+    extras: Dict[:class:`str`, :class:`str`]
+        A dict of extra metadata for a plugin.
+
+        .. versionadded:: 0.2.4
+    command_attrs: CommandParams
+        Parameters to apply to each prefix command in this plugin.
+    slash_command_attrs: SlashCommandParams
+        Parameters to apply to each slash command in this plugin.
+    message_command_attrs: AppCommandParams
+        Parameters to apply to each message command in this plugin.
+    user_command_attrs: AppCommandParams
+        Parameters to apply to each user command in this plugin.
+    """
+
     name: str
-    category: t.Optional[str] = None
+    """Plugin's name"""
+    extras: t.Dict[str, t.Any]
+    """A dict of extra metadata for a plugin."""
 
     command_attrs: CommandParams = dataclasses.field(default_factory=CommandParams)
+    """Parameters to apply to each prefix command in this plugin."""
     slash_command_attrs: SlashCommandParams = dataclasses.field(default_factory=SlashCommandParams)
+    """Parameters to apply to each slash command in this plugin."""
     message_command_attrs: AppCommandParams = dataclasses.field(default_factory=AppCommandParams)
+    """Parameters to apply to each message command in this plugin."""
     user_command_attrs: AppCommandParams = dataclasses.field(default_factory=AppCommandParams)
+    """Parameters to apply to each user command in this plugin."""
+
+    @property
+    def category(self) -> t.Optional[str]:
+        """The category this plugin belongs to. Does not serve any actual purpose,
+        but may be useful in organising plugins.
+
+        .. deprecated:: 0.2.4
+            Use :attr:`.extras` instead.
+        """
+        warnings.warn(
+            "Accessing `PluginMetadata.category` is deprecated. "
+            "Use `PluginMetadata.extras` instead.",
+            DeprecationWarning,
+        )
+        return self.extras.get("category")
+
+    @category.setter
+    def category(self, value: t.Optional[str]) -> None:
+        warnings.warn(
+            "Setting `PluginMetadata.category` is deprecated. Use `PluginMetadata.extras` instead.",
+            DeprecationWarning,
+        )
+        self.extras["category"] = value
 
 
 class ExtrasAware(t.Protocol):
@@ -135,13 +191,33 @@ def get_parent_plugin(obj: ExtrasAware) -> Plugin[AnyBot]:
 
 
 def _get_source_module_name() -> str:
-    frame = logging.currentframe()
-    if (fp := frame.f_code.co_filename).endswith("typing.py"):  # typevar specified
-        if frame.f_back:
-            fp = frame.f_back.f_code.co_filename
+    # Get current frame from exception traceback...
+    try:
+        raise Exception
+    except Exception as exc:
+        tb = exc.__traceback__
 
-    module_name = pathlib.Path(fp).stem
-    LOGGER.debug(f"Module name resolved to {module_name!r}")
+    if not tb:
+        # No traceback, therefore can't access frames and infer plugin name...
+        LOGGER.warning("Failed to infer file name, defaulting to 'plugin'.")
+        return "plugin"
+
+    # Navigate all frames for one with a valid path.
+    # Note that we explicitly filter out:
+    # - the stdlib typing module; if the generic parameter is specified, this
+    #   will be encountered before the target module.
+    # - this file; we don't want to just return "plugin" if possible.
+    frame = tb.tb_frame
+    while frame := frame.f_back:
+        if frame.f_code.co_filename not in _INVALID:
+            break
+
+    else:
+        LOGGER.warning("Failed to infer file name, defaulting to 'plugin'.")
+        return "plugin"
+
+    module_name = frame.f_locals["__name__"]
+    LOGGER.debug("Module name resolved to %r", module_name)
     return module_name
 
 
@@ -161,6 +237,9 @@ class Plugin(t.Generic[BotT]):
     category: Optional[:class:`str`]
         The category this plugin belongs to. Does not serve any actual purpose,
         but may be useful in organising plugins.
+
+        .. deprecated:: 0.2.4
+            Use ``extras`` instead.
     command_attrs: Dict[:class:`str`, Any]
         A dict of parameters to apply to each prefix command in this plugin.
     message_command_attrs: Dict[:class:`str`, Any]
@@ -172,6 +251,8 @@ class Plugin(t.Generic[BotT]):
     logger: Optional[Union[:class:`logging.Logger`, :class:`str`]]
         The logger or its name to use when logging plugin events.
         If not specified, defaults to `disnake.ext.plugins.plugin`.
+    **extras: Dict[:class:`str`, Any]
+        A dict of extra metadata for this plugin.
     """
 
     __slots__ = (
@@ -205,12 +286,12 @@ class Plugin(t.Generic[BotT]):
         self: Plugin[commands.Bot],
         *,
         name: t.Optional[str] = None,
-        category: t.Optional[str] = None,
         command_attrs: t.Optional[CommandParams] = None,
         message_command_attrs: t.Optional[AppCommandParams] = None,
         slash_command_attrs: t.Optional[SlashCommandParams] = None,
         user_command_attrs: t.Optional[AppCommandParams] = None,
         logger: t.Union[logging.Logger, str, None] = None,
+        **extras: t.Any,
     ) -> None:
         ...
 
@@ -219,12 +300,12 @@ class Plugin(t.Generic[BotT]):
         self,
         *,
         name: t.Optional[str] = None,
-        category: t.Optional[str] = None,
         command_attrs: t.Optional[CommandParams] = None,
         message_command_attrs: t.Optional[AppCommandParams] = None,
         slash_command_attrs: t.Optional[SlashCommandParams] = None,
         user_command_attrs: t.Optional[AppCommandParams] = None,
         logger: t.Union[logging.Logger, str, None] = None,
+        **extras: t.Any,
     ) -> None:
         ...
 
@@ -232,20 +313,20 @@ class Plugin(t.Generic[BotT]):
         self,
         *,
         name: t.Optional[str] = None,
-        category: t.Optional[str] = None,
         command_attrs: t.Optional[CommandParams] = None,
         message_command_attrs: t.Optional[AppCommandParams] = None,
         slash_command_attrs: t.Optional[SlashCommandParams] = None,
         user_command_attrs: t.Optional[AppCommandParams] = None,
         logger: t.Union[logging.Logger, str, None] = None,
+        **extras: t.Any,
     ) -> None:
         self.metadata: PluginMetadata = PluginMetadata(
             name=name or _get_source_module_name(),
-            category=category,
             command_attrs=command_attrs or {},
             message_command_attrs=message_command_attrs or {},
             slash_command_attrs=slash_command_attrs or {},
             user_command_attrs=user_command_attrs or {},
+            extras=extras,
         )
 
         if logger is not None:
@@ -316,8 +397,25 @@ class Plugin(t.Generic[BotT]):
 
     @property
     def category(self) -> t.Optional[str]:
-        """The category this plugin belongs to."""
-        return self.metadata.category
+        """The category this plugin belongs to.
+
+        .. deprecated:: 0.2.4
+            Use :attr:`.extras` instead.
+        """
+        warnings.warn(
+            "Accessing `Plugin.category` is deprecated. Use `Plugin.extras` instead.",
+            DeprecationWarning,
+        )
+
+        return self.extras.get("category")
+
+    @property
+    def extras(self) -> t.Dict[str, t.Any]:
+        """A dict of extra metadata for this plugin.
+
+        .. versionadded:: 0.2.4
+        """
+        return self.metadata.extras
 
     @property
     def commands(self) -> t.Sequence[commands.Command[Self, t.Any, t.Any]]:  # type: ignore
