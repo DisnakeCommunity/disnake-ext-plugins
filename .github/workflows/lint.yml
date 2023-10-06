@@ -33,6 +33,11 @@ jobs:
 
     needs: install
 
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
+      fail-fast: false
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v3
@@ -48,13 +53,6 @@ jobs:
           cache: poetry
 
     # We should have the cached venv from the install job here.
-
-    strategy:
-      matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11"]
-      fail-fast: false
-
-    steps:
       - name: Run pyright
         run: poetry run pyright --pythonversion {{ matrix.python-version }}
 
@@ -78,8 +76,6 @@ jobs:
           cache: poetry
 
     # We should have the cached venv from the install job here.
-
-    steps:
     - name: Run ruff
       run: poetry run ruff
 
