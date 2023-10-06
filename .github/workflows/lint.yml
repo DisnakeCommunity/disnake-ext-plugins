@@ -2,6 +2,10 @@ name: lint
 
 on:
   push:
+    branches:
+      - "master"
+      - 'v[0-9]+.[0-9]+.x'  # matches to backport branches, e.g. v3.6
+      - "run-ci/"
   pull_request:
 
 jobs:
