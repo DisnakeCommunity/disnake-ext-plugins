@@ -417,6 +417,10 @@ class Plugin(t.Generic[BotT]):
         """
         return self.metadata.extras
 
+    @extras.setter
+    def extras(self, value: t.Dict[str, t.Any]) -> None:
+        self.metadata.extras = value
+
     @property
     def commands(self) -> t.Sequence[commands.Command[Self, t.Any, t.Any]]:  # type: ignore
         """All prefix commands registered in this plugin."""
