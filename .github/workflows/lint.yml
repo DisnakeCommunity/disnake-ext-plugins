@@ -52,7 +52,7 @@ jobs:
           python-version: 3.8
           cache: poetry
 
-    # We should have the cached venv from the install job here.
+      # We should have the cached venv from the install job here.
       - name: Run pyright
         run: poetry run pyright --pythonversion {{ matrix.python-version }}
 
@@ -75,9 +75,9 @@ jobs:
           python-version: 3.8
           cache: poetry
 
-    # We should have the cached venv from the install job here.
-    - name: Run ruff
-      run: poetry run ruff
+      # We should have the cached venv from the install job here.
+      - name: Run ruff
+        run: poetry run ruff
 
-    - name: Run slotscheck
-      run: poetry run dev-symlink & poetry run slotscheck
+      - name: Run slotscheck
+        run: poetry run dev-symlink & poetry run slotscheck
