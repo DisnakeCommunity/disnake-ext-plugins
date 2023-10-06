@@ -1,3 +1,5 @@
+"""Module defining the main Plugin class."""
+
 from __future__ import annotations
 
 import asyncio
@@ -7,10 +9,11 @@ import sys
 import typing as t
 import warnings
 
-from typing_extensions import Self
-
 import disnake
 from disnake.ext import commands
+from typing_extensions import Self
+
+from . import async_utils
 
 if t.TYPE_CHECKING:
     from disnake.ext import tasks
@@ -137,8 +140,9 @@ class PluginMetadata:
 
     @property
     def category(self) -> t.Optional[str]:
-        """The category this plugin belongs to. Does not serve any actual purpose,
-        but may be useful in organising plugins.
+        """The category this plugin belongs to.
+
+        This does not serve any actual purpose but may be useful in organising plugins.
 
         .. deprecated:: 0.2.4
             Use :attr:`.extras` instead.
@@ -147,6 +151,7 @@ class PluginMetadata:
             "Accessing `PluginMetadata.category` is deprecated. "
             "Use `PluginMetadata.extras` instead.",
             DeprecationWarning,
+            stacklevel=2,
         )
         return self.extras.get("category")
 
@@ -155,6 +160,7 @@ class PluginMetadata:
         warnings.warn(
             "Setting `PluginMetadata.category` is deprecated. Use `PluginMetadata.extras` instead.",
             DeprecationWarning,
+            stacklevel=2,
         )
         self.extras["category"] = value
 
@@ -187,14 +193,17 @@ def get_parent_plugin(obj: ExtrasAware) -> Plugin[AnyBot]:
     if plugin := obj.extras.get("plugin"):
         return plugin
 
-    raise LookupError(f"Object {type(obj).__name__!r} does not belong to a Plugin.")
+    msg = f"Object {type(obj).__name__!r} does not belong to a Plugin."
+    raise LookupError(msg)
 
 
 def _get_source_module_name() -> str:
-    # Get current frame from exception traceback...
+    """Get current frame from exception traceback."""
+    # We ignore ruff here because we need to raise and immediately catch an
+    # exception to figure out our stack level.
     try:
-        raise Exception
-    except Exception as exc:
+        raise Exception  # noqa: TRY002, TRY301
+    except Exception as exc:  # noqa: BLE001
         tb = exc.__traceback__
 
     if not tb:
@@ -223,6 +232,7 @@ def _get_source_module_name() -> str:
 
 class Plugin(t.Generic[BotT]):
     """An extension manager similar to disnake's :class:`commands.Cog`.
+
     A plugin can hold commands and listeners, and supports being loaded through
     `bot.load_extension()` as per usual, and can similarly be unloaded and
     reloaded.
@@ -291,7 +301,7 @@ class Plugin(t.Generic[BotT]):
         slash_command_attrs: t.Optional[SlashCommandParams] = None,
         user_command_attrs: t.Optional[AppCommandParams] = None,
         logger: t.Union[logging.Logger, str, None] = None,
-        **extras: t.Any,
+        **extras: t.Any,  # noqa: ANN401
     ) -> None:
         ...
 
@@ -305,7 +315,7 @@ class Plugin(t.Generic[BotT]):
         slash_command_attrs: t.Optional[SlashCommandParams] = None,
         user_command_attrs: t.Optional[AppCommandParams] = None,
         logger: t.Union[logging.Logger, str, None] = None,
-        **extras: t.Any,
+        **extras: t.Any,  # noqa: ANN401
     ) -> None:
         ...
 
@@ -383,11 +393,13 @@ class Plugin(t.Generic[BotT]):
 
     @property
     def bot(self) -> BotT:
-        """The bot on which this plugin is registered. This will only be available
-        after calling :meth:`.load`.
+        """The bot on which this plugin is registered.
+
+        This will only be available after calling :meth:`.load`.
         """
         if not self._bot:
-            raise RuntimeError("Cannot access the bot on a plugin that has not yet been loaded.")
+            msg = "Cannot access the bot on a plugin that has not yet been loaded."
+            raise RuntimeError(msg)
         return self._bot
 
     @property
@@ -405,6 +417,7 @@ class Plugin(t.Generic[BotT]):
         warnings.warn(
             "Accessing `Plugin.category` is deprecated. Use `Plugin.extras` instead.",
             DeprecationWarning,
+            stacklevel=2,
         )
 
         return self.extras.get("category")
@@ -439,9 +452,14 @@ class Plugin(t.Generic[BotT]):
 
     @property
     def loops(self) -> t.Sequence[tasks.Loop[t.Any]]:
+        """All loops registered to this plugin."""
         return tuple(self._loops)
 
-    def _apply_attrs(self, attrs: t.Mapping[str, t.Any], **kwargs: t.Any) -> t.Dict[str, t.Any]:
+    def _apply_attrs(
+        self,
+        attrs: t.Mapping[str, t.Any],
+        **kwargs: t.Any,  # noqa: ANN401
+    ) -> t.Dict[str, t.Any]:
         new_attrs = {**attrs, **{k: v for k, v in kwargs.items() if v is not None}}
 
         # Ensure keys are set, but don't override any in case they are already in use.
@@ -458,10 +476,9 @@ class Plugin(t.Generic[BotT]):
         name: t.Optional[str] = None,
         *,
         cls: t.Optional[t.Type[commands.Command[t.Any, t.Any, t.Any]]] = None,
-        **kwargs: t.Any,
+        **kwargs: t.Any,  # noqa: ANN401
     ) -> CoroDecorator[AnyCommand]:
-        """A decorator that transforms a function into a :class:`commands.Command`
-        or if called with :func:`commands.group`, :class:`commands.Group`.
+        """Transform a function into a :class:`commands.Command`.
 
         By default the ``help`` attribute is received automatically from the
         docstring of the function and is cleaned up with the use of
@@ -495,7 +512,6 @@ class Plugin(t.Generic[BotT]):
         TypeError
             The function is not a coroutine or is already a command.
         """
-
         attributes = self._apply_attrs(self.metadata.command_attrs, **kwargs)
 
         if cls is None:
@@ -503,7 +519,8 @@ class Plugin(t.Generic[BotT]):
 
         def decorator(callback: t.Callable[..., Coro[t.Any]]) -> AnyCommand:
             if not asyncio.iscoroutinefunction(callback):
-                raise TypeError(f"<{callback.__qualname__}> must be a coroutine function.")
+                msg = f"<{callback.__qualname__}> must be a coroutine function."
+                raise TypeError(msg)
 
             command = cls(callback, name=name or callback.__name__, **attributes)
             self._commands[command.qualified_name] = command
@@ -517,9 +534,9 @@ class Plugin(t.Generic[BotT]):
         name: t.Optional[str] = None,
         *,
         cls: t.Optional[t.Type[commands.Group[t.Any, t.Any, t.Any]]] = None,
-        **kwargs: t.Any,
+        **kwargs: t.Any,  # noqa: ANN401
     ) -> CoroDecorator[AnyGroup]:
-        """A decorator that transforms a function into a :class:`commands.Group`.
+        """Transform a function into a :class:`commands.Group`.
 
         This is similar to the :func:`commands.command` decorator but the
         ``cls`` parameter is set to :class:`Group` by default.
@@ -554,7 +571,8 @@ class Plugin(t.Generic[BotT]):
 
         def decorator(callback: t.Callable[..., Coro[t.Any]]) -> AnyGroup:
             if not asyncio.iscoroutinefunction(callback):
-                raise TypeError(f"<{callback.__qualname__}> must be a coroutine function.")
+                msg = f"<{callback.__qualname__}> must be a coroutine function."
+                raise TypeError(msg)
 
             command = cls(callback, name=name or callback.__name__, **attributes)
             self._commands[command.qualified_name] = command  # type: ignore
@@ -577,7 +595,7 @@ class Plugin(t.Generic[BotT]):
         connectors: t.Optional[t.Dict[str, str]] = None,
         extras: t.Optional[t.Dict[str, t.Any]] = None,
     ) -> CoroDecorator[commands.InvokableSlashCommand]:
-        """A decorator that builds a slash command.
+        """Transform a function into a slash command.
 
         Parameters
         ----------
@@ -627,7 +645,8 @@ class Plugin(t.Generic[BotT]):
 
         def decorator(callback: t.Callable[..., Coro[t.Any]]) -> commands.InvokableSlashCommand:
             if not asyncio.iscoroutinefunction(callback):
-                raise TypeError(f"<{callback.__qualname__}> must be a coroutine function")
+                msg = f"<{callback.__qualname__}> must be a coroutine function."
+                raise TypeError(msg)
 
             command = commands.InvokableSlashCommand(
                 callback,
@@ -650,7 +669,7 @@ class Plugin(t.Generic[BotT]):
         guild_ids: t.Optional[t.Sequence[int]] = None,
         extras: t.Optional[t.Dict[str, t.Any]] = None,
     ) -> CoroDecorator[commands.InvokableUserCommand]:
-        """A shortcut decorator that builds a user command.
+        """Transform a function into a user command.
 
         Parameters
         ----------
@@ -679,7 +698,6 @@ class Plugin(t.Generic[BotT]):
             A decorator that converts the provided method into a
             :class:`commands.InvokableUserCommand` and returns it.
         """
-
         attributes = self._apply_attrs(
             self.metadata.user_command_attrs,
             dm_permission=dm_permission,
@@ -691,7 +709,8 @@ class Plugin(t.Generic[BotT]):
 
         def decorator(callback: t.Callable[..., Coro[t.Any]]) -> commands.InvokableUserCommand:
             if not asyncio.iscoroutinefunction(callback):
-                raise TypeError(f"<{callback.__qualname__}> must be a coroutine function")
+                msg = f"<{callback.__qualname__}> must be a coroutine function."
+                raise TypeError(msg)
 
             command = commands.InvokableUserCommand(
                 callback,
@@ -714,7 +733,7 @@ class Plugin(t.Generic[BotT]):
         guild_ids: t.Optional[t.Sequence[int]] = None,
         extras: t.Optional[t.Dict[str, t.Any]] = None,
     ) -> CoroDecorator[commands.InvokableMessageCommand]:
-        """A shortcut decorator that builds a message command.
+        """Transform a function into a message command.
 
         Parameters
         ----------
@@ -743,7 +762,6 @@ class Plugin(t.Generic[BotT]):
             A decorator that converts the provided method into an
             :class:`commands.InvokableMessageCommand` and then returns it.
         """
-
         attributes = self._apply_attrs(
             self.metadata.user_command_attrs,
             dm_permission=dm_permission,
@@ -755,7 +773,8 @@ class Plugin(t.Generic[BotT]):
 
         def decorator(callback: t.Callable[..., Coro[t.Any]]) -> commands.InvokableMessageCommand:
             if not asyncio.iscoroutinefunction(callback):
-                raise TypeError(f"<{callback.__qualname__}> must be a coroutine function")
+                msg = f"<{callback.__qualname__}> must be a coroutine function."
+                raise TypeError(msg)
 
             command = commands.InvokableMessageCommand(
                 callback,
@@ -771,28 +790,34 @@ class Plugin(t.Generic[BotT]):
     # Checks
 
     def command_check(self, predicate: PrefixCommandCheckT) -> PrefixCommandCheckT:
+        """Add a `commands.check` to all prefix commands on this plugin."""
         self._command_checks.append(predicate)
         return predicate
 
     def slash_command_check(self, predicate: AppCommandCheckT) -> AppCommandCheckT:
+        """Add a `commands.check` to all slash commands on this plugin."""
         self._slash_command_checks.append(predicate)
         return predicate
 
     def message_command_check(self, predicate: AppCommandCheckT) -> AppCommandCheckT:
+        """Add a `commands.check` to all message commands on this plugin."""
         self._message_command_checks.append(predicate)
         return predicate
 
     def user_command_check(self, predicate: AppCommandCheckT) -> AppCommandCheckT:
+        """Add a `commands.check` to all user commands on this plugin."""
         self._user_command_checks.append(predicate)
         return predicate
 
     # Listeners
 
     def add_listeners(self, *callbacks: CoroFunc, event: t.Optional[str] = None) -> None:
-        """A method that adds multiple listeners to the plugin.
+        """Add multiple listeners to the plugin.
 
         Parameters
         ----------
+        *callbacks: Callable[..., Any]
+            The callbacks to add as listeners for this plugin.
         event: :class:`str`
             The name of a single event to register all callbacks under. If not provided,
             the callbacks will be registered individually based on function's name.
@@ -802,7 +827,7 @@ class Plugin(t.Generic[BotT]):
             self._listeners.setdefault(key, []).append(callback)
 
     def listener(self, event: t.Optional[str] = None) -> t.Callable[[CoroFuncT], CoroFuncT]:
-        """A decorator that marks a function as a listener.
+        """Register a function as a listener on this plugin.
 
         This is the plugin equivalent of :meth:`commands.Bot.listen`.
 
@@ -822,12 +847,15 @@ class Plugin(t.Generic[BotT]):
     # Tasks
 
     def register_loop(self, *, wait_until_ready: bool = False) -> t.Callable[[LoopT], LoopT]:
-        """A decorator that registers a loop to be automatically started and
-        stopped along with the plugin being loaded and unloaded.
+        """Register a `tasks.Loop` to this plugin.
+
+        Loops registered in this way will automatically start and stop as the
+        plugin is loaded and unloaded, respectively.
+
         Parameters
         ----------
         wait_until_ready: :class:`bool`
-            Whether or not to add a simple `loop.before_loop` callback that waits
+            Whether or not to add a simple `before_loop` callback that waits
             until the bot is ready. This can be handy if you load plugins before
             you start the bot (which you should!) and make api requests with a
             loop.
@@ -838,10 +866,11 @@ class Plugin(t.Generic[BotT]):
 
         def decorator(loop: LoopT) -> LoopT:
             if wait_until_ready:
-                if loop._before_loop is not None:
-                    raise TypeError("This loop already has a `before_loop` callback registered.")
+                if loop._before_loop is not None:  # noqa: SLF001
+                    msg = "This loop already has a `before_loop` callback registered."
+                    raise TypeError(msg)
 
-                async def _before_loop():
+                async def _before_loop() -> None:
                     await self.bot.wait_until_ready()
 
                 loop.before_loop(_before_loop)
@@ -853,12 +882,15 @@ class Plugin(t.Generic[BotT]):
 
     # Plugin (un)loading...
 
+    # TODO: Maybe make this a standalone function instead of a staticmethod.
     @staticmethod
     def _prepend_plugin_checks(
         checks: t.Sequence[t.Union[PrefixCommandCheck, AppCommandCheck]],
         command: CheckAware,
     ) -> None:
-        """Internal method to handle updating checks with plugin-wide checks.
+        """Handle updating checks with plugin-wide checks.
+
+        This method is intended for internal use.
 
         To remain consistent with the behaviour of e.g. commands.Cog.cog_check,
         plugin-wide checks are **prepended** to the commands' local checks.
@@ -867,7 +899,7 @@ class Plugin(t.Generic[BotT]):
             command.checks = [*checks, *command.checks]
 
     async def load(self, bot: BotT) -> None:
-        """Registers commands to the bot and runs pre- and post-load hooks.
+        """Register commands to the bot and run pre- and post-load hooks.
 
         Parameters
         ----------
@@ -904,12 +936,12 @@ class Plugin(t.Generic[BotT]):
 
         await asyncio.gather(*(hook() for hook in self._post_load_hooks))
 
-        bot._schedule_delayed_command_sync()
+        bot._schedule_delayed_command_sync()  # noqa: SLF001
 
-        self.logger.info(f"Successfully loaded plugin `{self.metadata.name}`")
+        self.logger.info("Successfully loaded plugin %r", self.metadata.name)
 
     async def unload(self, bot: BotT) -> None:
-        """Removes commands from the bot and runs pre- and post-unload hooks.
+        """Remove commands from the bot and run pre- and post-unload hooks.
 
         Parameters
         ----------
@@ -919,16 +951,16 @@ class Plugin(t.Generic[BotT]):
         await asyncio.gather(*(hook() for hook in self._pre_unload_hooks))
 
         if isinstance(bot, commands.BotBase):
-            for command in self._commands.keys():
+            for command in self._commands:
                 bot.remove_command(command)
 
-        for command in self._slash_commands.keys():
+        for command in self._slash_commands:
             bot.remove_slash_command(command)
 
-        for command in self._user_commands.keys():
+        for command in self._user_commands:
             bot.remove_user_command(command)
 
-        for command in self._message_commands.keys():
+        for command in self._message_commands:
             bot.remove_message_command(command)
 
         for event, listeners in self._listeners.items():
@@ -940,12 +972,12 @@ class Plugin(t.Generic[BotT]):
 
         await asyncio.gather(*(hook() for hook in self._post_unload_hooks))
 
-        bot._schedule_delayed_command_sync()
+        bot._schedule_delayed_command_sync()  # noqa: SLF001
 
-        self.logger.info(f"Successfully unloaded plugin `{self.metadata.name}`")
+        self.logger.info("Successfully unloaded plugin %r", self.metadata.name)
 
-    def load_hook(self, post: bool = False) -> t.Callable[[EmptyAsync], EmptyAsync]:
-        """A decorator that marks a function as a load hook.
+    def load_hook(self, *, post: bool = False) -> t.Callable[[EmptyAsync], EmptyAsync]:
+        """Mark a function as a load hook.
 
         Parameters
         ----------
@@ -960,15 +992,14 @@ class Plugin(t.Generic[BotT]):
 
         return wrapper
 
-    def unload_hook(self, post: bool = False) -> t.Callable[[EmptyAsync], EmptyAsync]:
-        """A decorator that marks a function as an unload hook.
+    def unload_hook(self, *, post: bool = False) -> t.Callable[[EmptyAsync], EmptyAsync]:
+        """Mark a function as an unload hook.
 
         Parameters
         ----------
         post: :class:`bool`
             Whether the hook is a post-unload or pre-unload hook.
         """
-
         hooks = self._post_unload_hooks if post else self._pre_unload_hooks
 
         def wrapper(callback: EmptyAsync) -> EmptyAsync:
@@ -985,9 +1016,9 @@ class Plugin(t.Generic[BotT]):
         """
 
         def setup(bot: BotT) -> None:
-            asyncio.create_task(self.load(bot))
+            async_utils.safe_task(self.load(bot))
 
         def teardown(bot: BotT) -> None:
-            asyncio.create_task(self.unload(bot))
+            async_utils.safe_task(self.unload(bot))
 
         return setup, teardown
