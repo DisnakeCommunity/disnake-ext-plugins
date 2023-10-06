@@ -4,13 +4,27 @@ on:
   push:
   pull_request:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
-  cancel-in-progress: true
-
 jobs:
+  # NOTE: We use skip-duplicate-actions instead of builtin concurrency rules as
+  #       the latter makes runs cancelled due to concurrency count as failed.
+
+  pre-install:
+    runs-on: ubuntu-latest
+
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@v5
+        with:
+          concurrent_skipping: same_content_newer
+
   install:
     runs-on: ubuntu-latest
+
+    needs: pre-install
+    if: needs.pre-install.outputs.should_skip != 'true'
 
     steps:
       - name: Check out repository
