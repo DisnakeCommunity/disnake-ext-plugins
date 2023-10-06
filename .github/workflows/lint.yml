@@ -5,8 +5,23 @@ on:
   pull_request:
 
 jobs:
+  pre-install:
+    runs-on: ubuntu-latest
+
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@v5
+        with:
+          concurrent_skipping: same_content_newer
+
   install:
     runs-on: ubuntu-latest
+
+    needs: pre-install
+    if: needs.pre-install.outputs.should_skip != 'true'
 
     steps:
       - name: Check out repository
@@ -80,4 +95,5 @@ jobs:
         run: poetry run ruff .
 
       - name: Run slotscheck
+        if: success() || failure()
         run: poetry run dev-symlink & poetry run slotscheck -m disnake.ext.plugins
