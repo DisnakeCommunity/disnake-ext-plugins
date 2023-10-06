@@ -54,7 +54,7 @@ jobs:
 
       # We should have the cached venv from the install job here.
       - name: Run pyright
-        run: poetry run pyright --pythonversion {{ matrix.python-version }}
+        run: poetry run pyright --pythonversion ${{ matrix.python-version }}
 
   lint:
     runs-on: ubuntu-latest
@@ -77,7 +77,7 @@ jobs:
 
       # We should have the cached venv from the install job here.
       - name: Run ruff
-        run: poetry run ruff
+        run: poetry run ruff .
 
       - name: Run slotscheck
-        run: poetry run dev-symlink & poetry run slotscheck
+        run: poetry run dev-symlink & poetry run slotscheck -m disnake.ext.plugins
