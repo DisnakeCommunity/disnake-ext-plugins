@@ -983,6 +983,9 @@ class Plugin(t.Generic[BotT]):
     def load_hook(self, *, post: bool = False) -> t.Callable[[EmptyAsync], EmptyAsync]:
         """Mark a function as a load hook.
 
+        .. versionchanged:: 0.2.4
+            Argument `post` is now keyword-only.
+
         Parameters
         ----------
         post: :class:`bool`
@@ -998,6 +1001,9 @@ class Plugin(t.Generic[BotT]):
 
     def unload_hook(self, *, post: bool = False) -> t.Callable[[EmptyAsync], EmptyAsync]:
         """Mark a function as an unload hook.
+
+        .. versionchanged:: 0.2.4
+            Argument `post` is now keyword-only.
 
         Parameters
         ----------
