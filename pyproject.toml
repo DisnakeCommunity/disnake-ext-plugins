@@ -96,6 +96,9 @@ keep-runtime-typing = true
 [tool.ruff.pylint]
 max-args = 10
 
+[tool.ruff.pydocstyle]
+convention = "numpy"
+
 [tool.ruff.per-file-ignores]
 "scripts/*" = [
     # Allow printing in scripts.
