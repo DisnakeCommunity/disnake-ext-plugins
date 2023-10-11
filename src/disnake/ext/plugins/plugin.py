@@ -11,7 +11,7 @@ import warnings
 from disnake.ext import commands
 from typing_extensions import Self
 
-from . import typeshed, utils
+from . import placeholder, typeshed, utils
 
 if t.TYPE_CHECKING:
     from disnake.ext import tasks
@@ -630,6 +630,8 @@ class Plugin(PluginBase[typeshed.BotT]):
         "_post_load_hooks",
         "_pre_unload_hooks",
         "_post_unload_hooks",
+        "_sub_plugins",
+        "_placeholders",
     )
 
     logger: logging.Logger
@@ -676,6 +678,16 @@ class Plugin(PluginBase[typeshed.BotT]):
         self._bot: t.Optional[typeshed.BotT] = None
 
         self._sub_plugins: t.Set[SubPlugin[t.Any]] = set()
+        self._placeholders: t.Dict[
+            str,
+            t.List[
+                t.Union[
+                    placeholder.SubCommandPlaceholder,
+                    placeholder.SubCommandGroupPlaceholder,
+                ]
+            ],
+        ] = {}
+
     @property
     def bot(self) -> typeshed.BotT:
         """The bot on which this plugin is registered.
@@ -706,47 +718,97 @@ class Plugin(PluginBase[typeshed.BotT]):
         self._sub_plugins.add(sub_plugin)
         self._storage.update(sub_plugin._storage)  # noqa: SLF001
 
-        def decorator(callback: CoroFuncT) -> CoroFuncT:
-            self.add_listeners(callback, event=event)
-            return callback
+        for key, new_placeholders in sub_plugin._command_placeholders.items():  # noqa: SLF001
+            if key in self._placeholders:
+                self._placeholders[key].extend(new_placeholders)
+            else:
+                self._placeholders[key] = new_placeholders
 
         sub_plugin.bind(self)
 
-    # Tasks
+    def merge_placeholders(self, *, final: bool) -> None:
+        """Merge the placeholders registered to this Plugin with its commands.
 
-    def register_loop(self, *, wait_until_ready: bool = False) -> t.Callable[[LoopT], LoopT]:
-        """Register a `tasks.Loop` to this plugin.
+        You generally do not need to manually call this method, as it is
+        automatically called when the plugin is loaded. This is done after
+        pre-load hooks run.
 
-        Loops registered in this way will automatically start and stop as the
-        plugin is loaded and unloaded, respectively.
+        Calls to this method remove the internally stored placeholders as they
+        are successfully merged, so repeated calls are not a slowdown.
 
         Parameters
         ----------
-        wait_until_ready: :class:`bool`
-            Whether or not to add a simple `before_loop` callback that waits
-            until the bot is ready. This can be handy if you load plugins before
-            you start the bot (which you should!) and make api requests with a
-            loop.
-            .. warn::
-                This only works if the loop does not already have a `before_loop`
-                callback registered.
-        """
+        final:
+            If set to ``True``, ALL placeholders MUST successfully merge with a
+            parent command. Otherwise, any placeholders that fail to merge
+            are simply left as-is until a future call successfully merges them.
+            When :meth:`.load` automatically calls this, ``final`` is set to
+            ``True``.
 
-        def decorator(loop: LoopT) -> LoopT:
-            if wait_until_ready:
-                if loop._before_loop is not None:  # noqa: SLF001
-                    msg = "This loop already has a `before_loop` callback registered."
+        Raises
+        ------
+        RuntimeError:
+            ``final`` was set to ``True`` and a placeholder failed to merge.
+        TypeError:
+            The provided combination of parent command and placeholder command
+            do not merge to a valid :class:`SubCommandGroup` or
+            :class:`SubCommand`.
+        """
+        # We sort to make sure we don't ever attempt to register a subcommand
+        # before registering its subcommand group.
+        # E.g. we guarantee "foo bar" is added before "foo bar baz" because
+        # sorted() will return the former first.
+        sorted_keys = sorted(self._placeholders)
+
+        for name in sorted_keys:
+            placeholders = self._placeholders.pop(name)
+
+            parent = self.get_slash_command(name)
+            if not parent:
+                if final:
+                    msg = (
+                        f"Command placeholder {placeholders[0].qualified_name!r}"
+                        f" could not be finalised as no slash command with name"
+                        f" {name!r} is registered to plugin {self.name!r}."
+                    )
+                    raise RuntimeError(msg)
+
+                # This should happen very infrequently as we don't expect users
+                # to call this manually (with final=False) often, so it's
+                # probably more efficient to always pop and reinsert in this
+                # rare case.
+                self._placeholders[name] = placeholders
+                continue
+
+            if isinstance(parent, commands.SubCommand):
+                msg = (
+                    f"Command {parent.name!r} cannot have subcommands as it is"
+                    "itself is a subcommand."
+                )
+                raise TypeError(msg)
+
+            is_group = isinstance(parent, commands.SubCommandGroup)
+
+            for placeholder_ in placeholders:
+                # We've already checked that no SubCommands are used as parent,
+                # so the only possible parents are of type InvokableSlashCommand
+                # or SubCommandGroup.
+                # The only possible placeholders are of type SubCommandGroup or
+                # Subcommand.
+                # Therefore, the only thing we need to prevent is mistakenly
+                # trying to register a SubCommandGroup to another SubCommandGroup.
+                if is_group and isinstance(placeholder_, placeholder.SubCommandGroupPlaceholder):
+                    msg = (
+                        f"Cannot finalise placeholder SubCommandGroup {placeholder_.name!r}"
+                        f" by setting its parent to SubCommandGroup {parent.qualified_name!r}."
+                    )
                     raise TypeError(msg)
 
-                async def _before_loop() -> None:
-                    await self.bot.wait_until_ready()
+                # We've already validated everything, so this is safe to ignore.
+                # Ignoring here is considerably less painful than implementing
+                # more checks just to make this typecheck correctly. Sorry Eric.
+                placeholder_.set_parent(parent)  # pyright: ignore
 
-                loop.before_loop(_before_loop)
-
-            self._loops.append(loop)
-            return loop
-
-        return decorator
 
     # Plugin (un)loading...
 
@@ -777,6 +839,8 @@ class Plugin(PluginBase[typeshed.BotT]):
         self._bot = bot
 
         await asyncio.gather(*(hook() for hook in self._pre_load_hooks))
+
+        self.merge_placeholders(final=True)
 
         if isinstance(bot, commands.BotBase):
             for command in self.commands:
@@ -990,3 +1054,127 @@ class SubPlugin(PluginBase[typeshed.BotT]):
         """
         return self.plugin.logger
 
+    # Command placeholders...
+
+    def _add_command_placeholder(
+        self,
+        command: t.Union[placeholder.SubCommandPlaceholder, placeholder.SubCommandGroupPlaceholder],
+    ) -> None:
+        key = command.parent_name
+        if key in self._command_placeholders:
+            self._command_placeholders[key].append(command)
+
+        else:
+            self._command_placeholders[key] = [command]
+
+
+    def external_sub_command_group(
+        self,
+        parent_name: str,
+        *,
+        name: typeshed.LocalizedOptional = None,
+        extras: t.Optional[t.Dict[str, t.Any]] = None,
+    ) -> t.Callable[[typeshed.CoroFunc], placeholder.SubCommandGroupPlaceholder]:
+        """Wrap a callable to create a subcommand group in an external command.
+
+        As the parent command may not yet exist, this decorator returns a
+        placeholder object. The placeholder object has properties proxying to
+        the parent command that become available as soon as
+        :meth:`Plugin.finalise_placeholders` is called. This is done
+        automatically when it is loaded into the bot.
+
+        .. warning::
+            This ONLY works confined within the same :class:`Plugin`. Different
+            sub-plugins on the same plugin CAN have interdependent placeholders,
+            but you CANNOT make a placeholder dependent on an entirely
+            different plugin.
+
+        Parameters
+        ----------
+        parent_name:
+            The name of the parent :class:`InvokableSlashCommand` to which this
+            subcommand group should be registered.
+        name:
+            The name of this subcommand group. If not provided, this will use
+            the name of the decorated function.
+        extras:
+            Any extras that are to be stored on the command.
+
+        Returns
+        -------
+        Callable[..., :class:`SubCommandGroupPlaceholder`]
+            A decorator that converts the provided method into a
+            :class:`SubCommandGroupPlaceholder` and returns it.
+        """
+        def decorator(func: typeshed.CoroFunc) -> placeholder.SubCommandGroupPlaceholder:
+            placeholder_cmd = placeholder.SubCommandGroupPlaceholder(
+                func,
+                parent_name,
+                name=name,
+                extras=extras,
+            )
+            self._add_command_placeholder(placeholder_cmd)
+            return placeholder_cmd
+
+        return decorator
+
+    def external_sub_command(
+        self,
+        parent_name: str,
+        *,
+        name: typeshed.LocalizedOptional = None,
+        description: typeshed.LocalizedOptional = None,
+        connectors: t.Optional[t.Dict[str, str]] = None,
+        extras: t.Optional[t.Dict[str, t.Any]] = None,
+    ) -> t.Callable[[typeshed.CoroFunc], placeholder.SubCommandPlaceholder]:
+        """Wrap a callable to create a subcommand in an external command or group.
+
+        As the parent command may not yet exist, this decorator returns a
+        placeholder object. The placeholder object has properties proxying to
+        the parent command that become available as soon as
+        :meth:`Plugin.finalise_placeholders` is called. This is done
+        automatically when it is loaded into the bot.
+
+        .. warning::
+            This ONLY works confined within the same :class:`Plugin`. Different
+            sub-plugins on the same plugin CAN have interdependent placeholders,
+            but you CANNOT make a placeholder dependent on an entirely
+            different plugin.
+
+        Parameters
+        ----------
+        parent_name:
+            The name of the parent :class:`InvokableSlashCommand` or
+            :class:`SubCommandGroup` to which this subcommand should be
+            registered.
+        name:
+            The name of this subcommand. If not provided, this will use the
+            name of the decorated function.
+        description:
+            The description of this command. If not provided, this will use the
+            docstring of the decorated function.
+        connectors:
+            A mapping of option names to function parameter names, mainly for
+            internal processes.
+        extras:
+            Any extras that are to be stored on the subcommand.
+
+        Returns
+        -------
+        Callable[..., :class:`SubCommandPlaceholder`]
+            A decorator that converts the provided method into a
+            :class:`SubCommandGroupPlaceholder` and returns it.
+        """
+        def decorator(func: typeshed.CoroFunc) -> placeholder.SubCommandPlaceholder:
+            placeholder_cmd = placeholder.SubCommandPlaceholder(
+                func,
+                parent_name,
+                name=name,
+                description=description,
+                connectors=connectors,
+                extras=extras,
+            )
+            self._add_command_placeholder(placeholder_cmd)
+            return placeholder_cmd
+
+        return decorator
