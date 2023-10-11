@@ -99,6 +99,8 @@ class SlashCommandParams(AppCommandParams, total=False):
 class PluginProtocol(t.Protocol[BotT]):
     """Protocol for Plugin-like classes."""
 
+    __slots__: t.Sequence[str] = ()
+
     @property
     def bot(self) -> BotT:
         """The bot to which this plugin is registered."""
