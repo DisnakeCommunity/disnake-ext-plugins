@@ -542,6 +542,48 @@ class PluginBase(typeshed.PluginProtocol[typeshed.BotT]):
 
         return decorator
 
+    # Getters
+
+    def get_command(self, name: str) -> t.Optional[commands.Command[Self, t.Any, t.Any]]:  # pyright: ignore
+        part, _, name = name.strip().partition(" ")
+        command = self._storage.commands.get(name)
+
+        while name:
+            if not isinstance(command, commands.GroupMixin):
+                msg = (
+                    f"Got name {name!r}, indicating a Group with a sub-Command, but"
+                    f" command {part!r} is not a Group."
+                )
+                raise TypeError(msg)
+
+            part, _, name = name.partition(" ")
+            command: t.Optional[typeshed.AnyCommand] = command.get_command(name)
+
+        return command
+
+    def get_slash_command(self, name: str) -> t.Union[
+        commands.InvokableSlashCommand,
+        commands.SubCommandGroup,
+        commands.SubCommand,
+        None,
+    ]:
+        chain = name.strip().split()
+        length = len(chain)
+
+        slash = self._storage.slash_commands.get(chain[0])
+        if not slash or length == 1:
+            return slash
+
+        if length == 2:  # noqa: PLR2004
+            return slash.children.get(chain[1])
+
+        if length == 3:  # noqa: PLR2004
+            group = slash.children.get(chain[1])
+            if isinstance(group, commands.SubCommandGroup):
+                return group.children.get(chain[2])
+
+        return None
+
 
 # The actual Plugin implementation adds loading/unloading behaviour to the base.
 # For the user's convenience, we also provide easy access to custom loggers.
