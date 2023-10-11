@@ -129,21 +129,31 @@ def get_parent_plugin(obj: typeshed.ExtrasAware) -> Plugin[typeshed.AnyBot]:
 
 @dataclasses.dataclass
 class PluginStorage(t.Generic[typeshed.PluginT]):
-    commands: t.Dict[str, commands.Command[typeshed.PluginT, t.Any, t.Any]] = dataclasses.field(default_factory=dict)  # type: ignore
-    message_commands: t.Dict[str, commands.InvokableMessageCommand] = dataclasses.field(default_factory=dict)
-    slash_commands: t.Dict[str, commands.InvokableSlashCommand] = dataclasses.field(default_factory=dict)
-    user_commands: t.Dict[str, commands.InvokableUserCommand] = dataclasses.field(default_factory=dict)
+    commands: t.Dict[str, commands.Command[typeshed.PluginT, t.Any, t.Any]] = dataclasses.field(  # type: ignore
+        default_factory=dict,
+    )
+    message_commands: t.Dict[str, commands.InvokableMessageCommand] = dataclasses.field(
+        default_factory=dict,
+    )
+    slash_commands: t.Dict[str, commands.InvokableSlashCommand] = dataclasses.field(
+        default_factory=dict,
+    )
+    user_commands: t.Dict[str, commands.InvokableUserCommand] = dataclasses.field(
+        default_factory=dict,
+    )
 
     command_checks: t.List[typeshed.PrefixCommandCheck] = dataclasses.field(default_factory=list)
     slash_command_checks: t.List[typeshed.AppCommandCheck] = dataclasses.field(default_factory=list)
-    message_command_checks: t.List[typeshed.AppCommandCheck] = dataclasses.field(default_factory=list)
+    message_command_checks: t.List[typeshed.AppCommandCheck] = dataclasses.field(
+        default_factory=list,
+    )
     user_command_checks: t.List[typeshed.AppCommandCheck] = dataclasses.field(default_factory=list)
 
     loops: t.List[tasks.Loop[t.Any]] = dataclasses.field(default_factory=list)
 
     listeners: t.Dict[str, t.List[typeshed.CoroFunc]] = dataclasses.field(default_factory=dict)
 
-    def update(self, other: PluginStorage[typeshed.PluginT]) -> None:
+    def update(self, other: PluginStorage[t.Any]) -> None:
         """Update this PluginStorage with another, merging their container dicts and lists."""
         self.commands.update(other.commands)
         self.message_commands.update(other.message_commands)
@@ -167,6 +177,7 @@ class PluginStorage(t.Generic[typeshed.PluginT]):
 # The PluginBase holds the logic to register commands etc. to the plugin.
 # Since this is relevant for both actual plugins and sub plugins, this is a
 # separate base class that can be inherited by both.
+
 
 class PluginBase(typeshed.PluginProtocol[typeshed.BotT]):
     __slots__ = (
@@ -544,7 +555,10 @@ class PluginBase(typeshed.PluginProtocol[typeshed.BotT]):
 
     # Getters
 
-    def get_command(self, name: str) -> t.Optional[commands.Command[Self, t.Any, t.Any]]:  # pyright: ignore
+    def get_command(
+        self,
+        name: str,
+    ) -> t.Optional[commands.Command[Self, t.Any, t.Any]]:  # pyright: ignore
         part, _, name = name.strip().partition(" ")
         command = self._storage.commands.get(name)
 
@@ -561,7 +575,10 @@ class PluginBase(typeshed.PluginProtocol[typeshed.BotT]):
 
         return command
 
-    def get_slash_command(self, name: str) -> t.Union[
+    def get_slash_command(
+        self,
+        name: str,
+    ) -> t.Union[
         commands.InvokableSlashCommand,
         commands.SubCommandGroup,
         commands.SubCommand,
@@ -587,6 +604,7 @@ class PluginBase(typeshed.PluginProtocol[typeshed.BotT]):
 
 # The actual Plugin implementation adds loading/unloading behaviour to the base.
 # For the user's convenience, we also provide easy access to custom loggers.
+
 
 class Plugin(PluginBase[typeshed.BotT]):
     """An extension manager similar to disnake's :class:`commands.Cog`.
@@ -808,7 +826,6 @@ class Plugin(PluginBase[typeshed.BotT]):
                 # Ignoring here is considerably less painful than implementing
                 # more checks just to make this typecheck correctly. Sorry Eric.
                 placeholder_.set_parent(parent)  # pyright: ignore
-
 
     # Plugin (un)loading...
 
@@ -1067,7 +1084,6 @@ class SubPlugin(PluginBase[typeshed.BotT]):
         else:
             self._command_placeholders[key] = [command]
 
-
     def external_sub_command_group(
         self,
         parent_name: str,
@@ -1106,6 +1122,7 @@ class SubPlugin(PluginBase[typeshed.BotT]):
             A decorator that converts the provided method into a
             :class:`SubCommandGroupPlaceholder` and returns it.
         """
+
         def decorator(func: typeshed.CoroFunc) -> placeholder.SubCommandGroupPlaceholder:
             placeholder_cmd = placeholder.SubCommandGroupPlaceholder(
                 func,
@@ -1165,6 +1182,7 @@ class SubPlugin(PluginBase[typeshed.BotT]):
             A decorator that converts the provided method into a
             :class:`SubCommandGroupPlaceholder` and returns it.
         """
+
         def decorator(func: typeshed.CoroFunc) -> placeholder.SubCommandPlaceholder:
             placeholder_cmd = placeholder.SubCommandPlaceholder(
                 func,
