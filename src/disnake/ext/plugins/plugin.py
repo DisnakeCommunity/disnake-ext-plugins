@@ -633,6 +633,7 @@ class Plugin(PluginBase[typeshed.BotT]):
 
         self._bot: t.Optional[typeshed.BotT] = None
 
+        self._sub_plugins: t.Set[SubPlugin[t.Any]] = set()
     @property
     def bot(self) -> typeshed.BotT:
         """The bot on which this plugin is registered.
@@ -643,18 +644,31 @@ class Plugin(PluginBase[typeshed.BotT]):
             msg = "Cannot access the bot on a plugin that has not yet been loaded."
             raise RuntimeError(msg)
         return self._bot
+
+    # Subplugin registration
+
+    def register_sub_plugin(self, sub_plugin: SubPlugin[t.Any]) -> None:
+        """Register a :class:`SubPlugin` to this plugin.
+
+        This registers all commands, slash commands, listeners, loops, etc.
+        that are registered on the sub-plugin to this Plugin.
+
+        When this Plugin is unloaded, all sub-plugins are automatically
+        unloaded along with it.
+
         Parameters
         ----------
-        event: :class:`str`
-            The name of the event being listened to. If not provided, it
-            defaults to the function's name.
+        sub_plugin:
+            The :class:`SubPlugin` that is to be registered.
         """
+        self._sub_plugins.add(sub_plugin)
+        self._storage.update(sub_plugin._storage)  # noqa: SLF001
 
         def decorator(callback: CoroFuncT) -> CoroFuncT:
             self.add_listeners(callback, event=event)
             return callback
 
-        return decorator
+        sub_plugin.bind(self)
 
     # Tasks
 
@@ -850,3 +864,87 @@ class Plugin(PluginBase[typeshed.BotT]):
             utils.safe_task(self.unload(bot))
 
         return setup, teardown
+
+
+class SubPlugin(PluginBase[typeshed.BotT]):
+    """Bean."""
+
+    __slots__: t.Sequence[str] = (
+        "_plugin",
+        "_command_placeholders",
+    )
+
+    _plugin: t.Optional[Plugin[typeshed.BotT]]
+    _command_placeholders: t.Dict[
+        str,
+        t.List[t.Union[placeholder.SubCommandPlaceholder, placeholder.SubCommandGroupPlaceholder]],
+    ]
+
+    def __init__(
+        self,
+        *,
+        name: t.Optional[str] = None,
+        command_attrs: t.Optional[typeshed.CommandParams] = None,
+        message_command_attrs: t.Optional[typeshed.AppCommandParams] = None,
+        slash_command_attrs: t.Optional[typeshed.SlashCommandParams] = None,
+        user_command_attrs: t.Optional[typeshed.AppCommandParams] = None,
+        **extras: t.Any,  # noqa: ANN401
+    ) -> None:
+        super().__init__(
+            name=name,
+            command_attrs=command_attrs,
+            message_command_attrs=message_command_attrs,
+            slash_command_attrs=slash_command_attrs,
+            user_command_attrs=user_command_attrs,
+            **extras,
+        )
+        self._plugin = None
+        self._command_placeholders = {}
+
+    def bind(self, plugin: Plugin[typeshed.BotT]) -> None:
+        """Bind a main Plugin to this SubPlugin.
+
+        This generally doesn't need to be called manually. Instead, use
+        :meth:`Plugin.register_sub_plugin`, which will call this automatically.
+
+        Arguments
+        ---------
+        plugin:
+            The Plugin to bind to this SubPlugin.
+        """
+        if self._plugin:
+            msg = f"This subplugin is already bound to a Plugin named {self._plugin.name!r}"
+            raise RuntimeError(msg)
+
+        self._plugin = plugin
+
+    @property
+    def plugin(self) -> Plugin[typeshed.BotT]:
+        """The Plugin of which this is a SubPlugin.
+
+        This is only available after the sub plugin was bound to a :class:`Plugin`.
+        """
+        if self._plugin:
+            return self._plugin
+
+        msg = f"The SubPlugin named {self.name!r} has not yet been bound to a Plugin."
+        raise RuntimeError(msg)
+
+    @property
+    def bot(self) -> typeshed.BotT:
+        """The Plugin of which this is a SubPlugin.
+
+        This is only available after the sub plugin was bound to a :class:`Plugin`,
+        and that plugin was loaded via :meth:`Plugin.load`.
+        """
+        return self.plugin.bot
+
+    # TODO: Maybe allow setting a separate logger here?
+    @property
+    def logger(self) -> logging.Logger:
+        """The logger of the Plugin of which this is a SubPlugin.
+
+        This is only available after the sub plugin was bound to a :class:`Plugin`.
+        """
+        return self.plugin.logger
+
