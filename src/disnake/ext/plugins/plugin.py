@@ -779,7 +779,7 @@ class Plugin(PluginBase[typeshed.BotT]):
         sorted_keys = sorted(self._placeholders)
 
         for name in sorted_keys:
-            placeholders = self._placeholders.pop(name)
+            placeholders = self._placeholders[name]
 
             parent = self.get_slash_command(name)
             if not parent:
@@ -791,17 +791,12 @@ class Plugin(PluginBase[typeshed.BotT]):
                     )
                     raise RuntimeError(msg)
 
-                # This should happen very infrequently as we don't expect users
-                # to call this manually (with final=False) often, so it's
-                # probably more efficient to always pop and reinsert in this
-                # rare case.
-                self._placeholders[name] = placeholders
                 continue
 
             if isinstance(parent, commands.SubCommand):
                 msg = (
                     f"Command {parent.name!r} cannot have subcommands as it is"
-                    "itself is a subcommand."
+                    "itself a subcommand."
                 )
                 raise TypeError(msg)
 
@@ -819,6 +814,7 @@ class Plugin(PluginBase[typeshed.BotT]):
                     msg = (
                         f"Cannot finalise placeholder SubCommandGroup {placeholder_.name!r}"
                         f" by setting its parent to SubCommandGroup {parent.qualified_name!r}."
+                        " (SubCommandGroups cannot have further SubCommandGroups as children.)"
                     )
                     raise TypeError(msg)
 
@@ -826,6 +822,10 @@ class Plugin(PluginBase[typeshed.BotT]):
                 # Ignoring here is considerably less painful than implementing
                 # more checks just to make this typecheck correctly. Sorry Eric.
                 placeholder_.set_parent(parent)  # pyright: ignore
+
+            # Merging all commands into the parent was succesful, so we can
+            # delete the key.
+            del self._placeholders[name]
 
     # Plugin (un)loading...
 
@@ -1122,6 +1122,17 @@ class SubPlugin(PluginBase[typeshed.BotT]):
             A decorator that converts the provided method into a
             :class:`SubCommandGroupPlaceholder` and returns it.
         """
+        # First we validate whether this placeholder even *can* work. The
+        # sooner and closer to where they make a mistake we can inform a user of
+        # a mistake, the better.
+        parent_name = parent_name.strip()
+        if " " in parent_name:
+            msg = (
+                "Subcommand groups can only be added to top-level slash"
+                f" commands. The provided parent name {parent_name!r} implies"
+                "the parent is a subcommand or group."
+            )
+            raise ValueError(msg)
 
         def decorator(func: typeshed.CoroFunc) -> placeholder.SubCommandGroupPlaceholder:
             placeholder_cmd = placeholder.SubCommandGroupPlaceholder(
@@ -1182,6 +1193,17 @@ class SubPlugin(PluginBase[typeshed.BotT]):
             A decorator that converts the provided method into a
             :class:`SubCommandGroupPlaceholder` and returns it.
         """
+        # First we validate whether this placeholder even *can* work. The
+        # sooner and closer to where they make a mistake we can inform a user of
+        # a mistake, the better.
+        parent_name = parent_name.strip()
+        if parent_name.count(" ") > 1:
+            msg = (
+                f"The provided parent name {parent_name!r} implies the parent"
+                " would itself be a subcommand, but subcommands cannot have"
+                " children."
+            )
+            raise ValueError(msg)
 
         def decorator(func: typeshed.CoroFunc) -> placeholder.SubCommandPlaceholder:
             placeholder_cmd = placeholder.SubCommandPlaceholder(
