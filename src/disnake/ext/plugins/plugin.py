@@ -41,8 +41,9 @@ AnyBot = t.Union[
 
 BotT = t.TypeVar("BotT", bound=AnyBot)
 ExtrasT = TypeVar(
-    "ExtrasT", bound=t.TypedDict,
-    default=t.Dict[str, t.Any], # type: ignore # dict is not a subtype of typeddict blah blah blah
+    "ExtrasT",
+    bound=t.TypedDict,
+    default=t.Dict[str, t.Any],  # type: ignore # dict is not a subtype of typeddict blah blah blah
 )
 
 Coro = t.Coroutine[t.Any, t.Any, T]

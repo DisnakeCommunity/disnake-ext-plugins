@@ -14,9 +14,11 @@ from disnake.ext import commands, plugins
 # To enable type safety for `.extras`, we create a type for the data we
 # will store there. See `TypedDict`'s documentation for more.
 
+
 class MyExtras(typing.TypedDict, total=False):
     foo: typing.Literal["bar"]
     bar: typing.Literal["foo"]
+
 
 # Then, when creating `Plugin` instance, specify types using the
 # square bracket notation.
