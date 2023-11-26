@@ -7,16 +7,22 @@ import dataclasses
 import logging
 import sys
 import typing as t
-import warnings
 
 import disnake
 from disnake.ext import commands
-from typing_extensions import Self
+from typing_extensions import Self, TypeVar
 
 from . import async_utils
 
 if t.TYPE_CHECKING:
     from disnake.ext import tasks
+
+    class DefaultExtras(t.TypedDict):
+        pass
+
+    ExtrasT = TypeVar("ExtrasT", bound=t.TypedDict, default=DefaultExtras)
+else:
+    ExtrasT = t.TypeVar("ExtrasT", bound=t.TypedDict)
 
 
 __all__ = ("Plugin", "PluginMetadata", "get_parent_plugin")
@@ -97,20 +103,14 @@ class SlashCommandParams(AppCommandParams, total=False):
 
 
 @dataclasses.dataclass
-class PluginMetadata:
+class PluginMetadata(t.Generic[ExtrasT]):
     """Represents metadata for a :class:`Plugin`.
 
     Parameters
     ----------
     name: :class:`str`
         Plugin's name.
-    category: Optional[:class:`str`]
-        The category this plugin belongs to. Does not serve any actual purpose,
-        but may be useful in organising plugins.
-
-        .. deprecated:: 0.2.4
-            Use :attr:`.extras` instead.
-    extras: Dict[:class:`str`, :class:`str`]
+    extras: ExtrasT
         A dict of extra metadata for a plugin.
 
         .. versionadded:: 0.2.4
@@ -126,7 +126,7 @@ class PluginMetadata:
 
     name: str
     """Plugin's name"""
-    extras: t.Dict[str, t.Any]
+    extras: ExtrasT
     """A dict of extra metadata for a plugin."""
 
     command_attrs: CommandParams = dataclasses.field(default_factory=CommandParams)
@@ -138,38 +138,12 @@ class PluginMetadata:
     user_command_attrs: AppCommandParams = dataclasses.field(default_factory=AppCommandParams)
     """Parameters to apply to each user command in this plugin."""
 
-    @property
-    def category(self) -> t.Optional[str]:
-        """The category this plugin belongs to.
 
-        This does not serve any actual purpose but may be useful in organising plugins.
-
-        .. deprecated:: 0.2.4
-            Use :attr:`.extras` instead.
-        """
-        warnings.warn(
-            "Accessing `PluginMetadata.category` is deprecated. "
-            "Use `PluginMetadata.extras` instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.extras.get("category")
-
-    @category.setter
-    def category(self, value: t.Optional[str]) -> None:
-        warnings.warn(
-            "Setting `PluginMetadata.category` is deprecated. Use `PluginMetadata.extras` instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self.extras["category"] = value
+class ExtrasAware(t.Protocol, t.Generic[ExtrasT]):
+    extras: ExtrasT
 
 
-class ExtrasAware(t.Protocol):
-    extras: t.Dict[str, t.Any]
-
-
-def get_parent_plugin(obj: ExtrasAware) -> Plugin[AnyBot]:
+def get_parent_plugin(obj: ExtrasAware[ExtrasT]) -> Plugin[AnyBot, ExtrasT]:
     """Get the plugin to which the provided object is registered.
 
     This only works with objects that support an ``extras`` attribute.
@@ -177,8 +151,8 @@ def get_parent_plugin(obj: ExtrasAware) -> Plugin[AnyBot]:
     Parameters
     ----------
     obj: ExtrasAware
-        Any object that supports an ``extras`` attribute, which should be a dict
-        with ``str`` keys.
+        Any object that supports an ``extras`` attribute, which should be a
+        subclass of dict.
 
     Returns
     -------
@@ -190,7 +164,7 @@ def get_parent_plugin(obj: ExtrasAware) -> Plugin[AnyBot]:
     LookupError:
         The object is not registered to any plugin.
     """
-    if plugin := obj.extras.get("plugin"):
+    if plugin := t.cast(Plugin[AnyBot, ExtrasT], obj.extras.get("plugin")):
         return plugin
 
     msg = f"Object {type(obj).__name__!r} does not belong to a Plugin."
@@ -230,7 +204,7 @@ def _get_source_module_name() -> str:
     return module_name
 
 
-class Plugin(t.Generic[BotT]):
+class Plugin(t.Generic[BotT, ExtrasT]):
     """An extension manager similar to disnake's :class:`commands.Cog`.
 
     A plugin can hold commands and listeners, and supports being loaded through
@@ -261,7 +235,7 @@ class Plugin(t.Generic[BotT]):
     logger: Optional[Union[:class:`logging.Logger`, :class:`str`]]
         The logger or its name to use when logging plugin events.
         If not specified, defaults to `disnake.ext.plugins.plugin`.
-    **extras: Dict[:class:`str`, Any]
+    **extras: ExtrasT
         A dict of extra metadata for this plugin.
     """
 
@@ -285,7 +259,7 @@ class Plugin(t.Generic[BotT]):
         "_post_unload_hooks",
     )
 
-    metadata: PluginMetadata
+    metadata: PluginMetadata[ExtrasT]
     """The metadata assigned to the plugin."""
 
     logger: logging.Logger
@@ -330,13 +304,13 @@ class Plugin(t.Generic[BotT]):
         logger: t.Union[logging.Logger, str, None] = None,
         **extras: t.Any,
     ) -> None:
-        self.metadata: PluginMetadata = PluginMetadata(
+        self.metadata = PluginMetadata[ExtrasT](
             name=name or _get_source_module_name(),
             command_attrs=command_attrs or {},
             message_command_attrs=message_command_attrs or {},
             slash_command_attrs=slash_command_attrs or {},
             user_command_attrs=user_command_attrs or {},
-            extras=extras,
+            extras=extras,  # type: ignore
         )
 
         if logger is not None:
@@ -373,7 +347,7 @@ class Plugin(t.Generic[BotT]):
         self._bot: t.Optional[BotT] = None
 
     @classmethod
-    def with_metadata(cls, metadata: PluginMetadata) -> Self:
+    def with_metadata(cls, metadata: PluginMetadata[ExtrasT]) -> Self:
         """Create a Plugin with pre-existing metadata.
 
         Parameters
@@ -408,22 +382,7 @@ class Plugin(t.Generic[BotT]):
         return self.metadata.name
 
     @property
-    def category(self) -> t.Optional[str]:
-        """The category this plugin belongs to.
-
-        .. deprecated:: 0.2.4
-            Use :attr:`.extras` instead.
-        """
-        warnings.warn(
-            "Accessing `Plugin.category` is deprecated. Use `Plugin.extras` instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        return self.extras.get("category")
-
-    @property
-    def extras(self) -> t.Dict[str, t.Any]:
+    def extras(self) -> ExtrasT:
         """A dict of extra metadata for this plugin.
 
         .. versionadded:: 0.2.4
@@ -431,7 +390,7 @@ class Plugin(t.Generic[BotT]):
         return self.metadata.extras
 
     @extras.setter
-    def extras(self, value: t.Dict[str, t.Any]) -> None:
+    def extras(self, value: ExtrasT) -> None:
         self.metadata.extras = value
 
     @property
