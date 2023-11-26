@@ -40,7 +40,7 @@ pre-commit = "^2.18.1"
 taskipy = "^1.10.1"
 
 black="~22.8.0"
-pyright="~1.1.272"
+pyright="~1.1.337"
 slotscheck="~0.15.0"
 ruff = "^0.0.292"
 
