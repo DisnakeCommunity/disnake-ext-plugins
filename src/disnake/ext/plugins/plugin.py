@@ -17,15 +17,7 @@ from . import async_utils
 if t.TYPE_CHECKING:
     from disnake.ext import tasks
 
-    class DefaultExtras(t.TypedDict):
-        pass
-
-    ExtrasT = TypeVar("ExtrasT", bound=t.TypedDict, default=DefaultExtras)
-else:
-    ExtrasT = t.TypeVar("ExtrasT", bound=t.TypedDict)
-
-
-__all__ = ("Plugin", "PluginMetadata", "get_parent_plugin")
+__all__ = ("Plugin", "PluginMetadata", "get_parent_plugin", "AnyBot")
 
 LOGGER = logging.getLogger(__name__)
 _INVALID: t.Final[t.Sequence[str]] = (t.__file__, __file__)
@@ -48,6 +40,10 @@ AnyBot = t.Union[
 ]
 
 BotT = t.TypeVar("BotT", bound=AnyBot)
+ExtrasT = TypeVar(
+    "ExtrasT", bound=t.TypedDict,
+    default=t.Dict[str, t.Any], # type: ignore # dict is not a subtype of typeddict blah blah blah
+)
 
 Coro = t.Coroutine[t.Any, t.Any, T]
 MaybeCoro = t.Union[Coro[T], T]
