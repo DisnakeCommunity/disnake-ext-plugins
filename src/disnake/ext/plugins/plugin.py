@@ -39,10 +39,13 @@ AnyBot = t.Union[
     commands.AutoShardedInteractionBot,
 ]
 
+class TypedDict(t.TypedDict, total=False):
+    pass
+
 BotT = t.TypeVar("BotT", bound=AnyBot)
 ExtrasT = TypeVar(
     "ExtrasT",
-    bound=t.TypedDict,
+    bound=TypedDict,
     default=t.Dict[str, t.Any],  # type: ignore # dict is not a subtype of typeddict blah blah blah
 )
 
