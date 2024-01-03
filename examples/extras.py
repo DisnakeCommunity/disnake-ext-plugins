@@ -18,7 +18,7 @@ async def what_is_what(ctx: commands.Context[commands.Bot]):
 # Likewise you can change this data at runtime.
 
 
-@extras_plugin.listener("on_message")
+@extras_plugin.command()
 async def swap_foobar(ctx: commands.Context[commands.Bot]):
     if extras_plugin.extras.get("foo"):
         extras_plugin.extras = {"bar": "foo"}
