@@ -5,18 +5,19 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import logging
-import sys
 import typing as t
 import warnings
 
 import disnake
 from disnake.ext import commands
-from typing_extensions import Self
 
 from . import async_utils
 
 if t.TYPE_CHECKING:
     from disnake.ext import tasks
+    from typing_extensions import ParamSpec, Self
+
+    P = ParamSpec("P")
 
 
 __all__ = ("Plugin", "PluginMetadata", "get_parent_plugin")
@@ -25,13 +26,6 @@ LOGGER = logging.getLogger(__name__)
 _INVALID: t.Final[t.Sequence[str]] = (t.__file__, __file__)
 
 T = t.TypeVar("T")
-
-if sys.version_info < (3, 10):
-    import typing_extensions
-
-    P = typing_extensions.ParamSpec("P")
-else:
-    P = t.ParamSpec("P")
 
 
 AnyBot = t.Union[
