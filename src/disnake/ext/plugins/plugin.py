@@ -788,7 +788,7 @@ class Plugin(t.Generic[BotT]):
             :class:`commands.InvokableMessageCommand` and then returns it.
         """
         attributes = self._apply_attrs(
-            self.metadata.user_command_attrs,
+            self.metadata.message_command_attrs,
             dm_permission=dm_permission,
             default_member_permissions=default_member_permissions,
             guild_ids=guild_ids,
