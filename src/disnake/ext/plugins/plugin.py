@@ -19,12 +19,13 @@ if t.TYPE_CHECKING:
     from disnake.ext import tasks
 
 
-__all__ = ("Plugin", "PluginMetadata", "get_parent_plugin")
+__all__ = ("Plugin", "PluginMetadata", "get_parent_plugin", "PluginKey")
 
 LOGGER = logging.getLogger(__name__)
 _INVALID: t.Final[t.Sequence[str]] = (t.__file__, __file__)
 
 T = t.TypeVar("T")
+U = t.TypeVar("U")
 
 if sys.version_info < (3, 10):
     import typing_extensions
@@ -65,6 +66,15 @@ AppCommandCheck = t.Callable[[disnake.CommandInteraction], MaybeCoro[bool]]
 
 PrefixCommandCheckT = t.TypeVar("PrefixCommandCheckT", bound=PrefixCommandCheck)
 AppCommandCheckT = t.TypeVar("AppCommandCheckT", bound=AppCommandCheck)
+
+
+class PluginKey(str, t.Generic[T]):
+    """A :class:`str` subclass for type-safe access to :attr:`Plugin.extras`."""
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:
+        return f"<PluginKey name={str(self)!r}>"
 
 
 class CheckAware(t.Protocol):
@@ -433,6 +443,23 @@ class Plugin(t.Generic[BotT]):
     @extras.setter
     def extras(self, value: t.Dict[str, t.Any]) -> None:
         self.metadata.extras = value
+
+    # mutmap api
+
+    def __getitem__(self, key: PluginKey[T]) -> T:
+        return self.extras[key]
+
+    def __setitem__(self, key: PluginKey[T], value: T) -> None:
+        self.extras[key] = value
+
+    def __delitem__(self, key: PluginKey[t.Any]) -> None:
+        del self.extras[key]
+
+    def get(self, key: PluginKey[T], default: U = None) -> t.Union[T, U]:
+        """Type-safe method of calling ``plugin.extras.get`` directly."""
+        return self.extras.get(key, default)
+
+    # end mutmap api
 
     @property
     def commands(self) -> t.Sequence[commands.Command[Self, t.Any, t.Any]]:  # type: ignore
