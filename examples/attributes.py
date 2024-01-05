@@ -29,4 +29,17 @@ async def my_other_command(inter: disnake.CommandInteraction):
     ...
 
 
+# You can also manually define and pass attribute "bundles". This is regular
+# python "unpack" syntax, so you can't pass the same parameter both in the bundle
+# and as a parameter. Additionally, annotating bundle's type will ensure that you
+# don't accidentally make a typo or pass an extraneous parameter.
+
+attrs: plugins.AppCommandAttrs = {"auto_sync": False}
+
+# This command will not be automatically synced and will be only avail
+@plugin.slash_command(**attrs)
+async def another_command(inter: disnake.CommandInteraction):
+    ...
+
+
 setup, teardown = plugin.create_extension_handlers()
