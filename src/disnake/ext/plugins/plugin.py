@@ -20,7 +20,8 @@ if t.TYPE_CHECKING:
     P = ParamSpec("P")
 
 
-__all__ = ("Plugin", "PluginMetadata", "get_parent_plugin", "PluginKey")
+__all__ = ("Plugin", "PluginMetadata", "get_parent_plugin", "PluginKey",
+           "AppCommandAttrs", "SlashCommandAttrs")
 
 LOGGER = logging.getLogger(__name__)
 _INVALID: t.Final[t.Sequence[str]] = (t.__file__, __file__)
@@ -87,7 +88,15 @@ class CommandParams(t.TypedDict, total=False):
     extras: t.Dict[str, t.Any]
 
 
-class AppCommandParams(t.TypedDict, total=False):
+class AppCommandAttrs(t.TypedDict, total=False):
+    """A :class:`TypedDict` of valid attributes (parameters) for app command decorators.
+
+    Specifically, the following decorators can accept this set of attributes:
+    - :func:`Plugin.user_command`;
+    - :func:`Plugin.message_command`;
+    - and :func:`Plugin.slash_command`.
+    """
+
     auto_sync: bool
     dm_permission: bool
     default_member_permissions: PermissionsOptional
@@ -95,7 +104,9 @@ class AppCommandParams(t.TypedDict, total=False):
     extras: t.Dict[str, t.Any]
 
 
-class SlashCommandParams(AppCommandParams, total=False):
+class SlashCommandAttrs(AppCommandAttrs, total=False):
+    """A :class:`TypedDict` of valid attributes (parameters) for :func:`Plugin.slash_command`."""
+
     description: LocalizedOptional
     connectors: t.Dict[str, str]
 
@@ -135,11 +146,11 @@ class PluginMetadata:
 
     command_attrs: CommandParams = dataclasses.field(default_factory=CommandParams)
     """Parameters to apply to each prefix command in this plugin."""
-    slash_command_attrs: SlashCommandParams = dataclasses.field(default_factory=SlashCommandParams)
+    slash_command_attrs: SlashCommandAttrs = dataclasses.field(default_factory=SlashCommandAttrs)
     """Parameters to apply to each slash command in this plugin."""
-    message_command_attrs: AppCommandParams = dataclasses.field(default_factory=AppCommandParams)
+    message_command_attrs: AppCommandAttrs = dataclasses.field(default_factory=AppCommandAttrs)
     """Parameters to apply to each message command in this plugin."""
-    user_command_attrs: AppCommandParams = dataclasses.field(default_factory=AppCommandParams)
+    user_command_attrs: AppCommandAttrs = dataclasses.field(default_factory=AppCommandAttrs)
     """Parameters to apply to each user command in this plugin."""
 
     @property
@@ -301,9 +312,9 @@ class Plugin(t.Generic[BotT]):
         *,
         name: t.Optional[str] = None,
         command_attrs: t.Optional[CommandParams] = None,
-        message_command_attrs: t.Optional[AppCommandParams] = None,
-        slash_command_attrs: t.Optional[SlashCommandParams] = None,
-        user_command_attrs: t.Optional[AppCommandParams] = None,
+        message_command_attrs: t.Optional[AppCommandAttrs] = None,
+        slash_command_attrs: t.Optional[SlashCommandAttrs] = None,
+        user_command_attrs: t.Optional[AppCommandAttrs] = None,
         logger: t.Union[logging.Logger, str, None] = None,
         **extras: t.Any,  # noqa: ANN401
     ) -> None:
@@ -315,9 +326,9 @@ class Plugin(t.Generic[BotT]):
         *,
         name: t.Optional[str] = None,
         command_attrs: t.Optional[CommandParams] = None,
-        message_command_attrs: t.Optional[AppCommandParams] = None,
-        slash_command_attrs: t.Optional[SlashCommandParams] = None,
-        user_command_attrs: t.Optional[AppCommandParams] = None,
+        message_command_attrs: t.Optional[AppCommandAttrs] = None,
+        slash_command_attrs: t.Optional[SlashCommandAttrs] = None,
+        user_command_attrs: t.Optional[AppCommandAttrs] = None,
         logger: t.Union[logging.Logger, str, None] = None,
         **extras: t.Any,  # noqa: ANN401
     ) -> None:
@@ -328,9 +339,9 @@ class Plugin(t.Generic[BotT]):
         *,
         name: t.Optional[str] = None,
         command_attrs: t.Optional[CommandParams] = None,
-        message_command_attrs: t.Optional[AppCommandParams] = None,
-        slash_command_attrs: t.Optional[SlashCommandParams] = None,
-        user_command_attrs: t.Optional[AppCommandParams] = None,
+        message_command_attrs: t.Optional[AppCommandAttrs] = None,
+        slash_command_attrs: t.Optional[SlashCommandAttrs] = None,
+        user_command_attrs: t.Optional[AppCommandAttrs] = None,
         logger: t.Union[logging.Logger, str, None] = None,
         **extras: t.Any,
     ) -> None:
