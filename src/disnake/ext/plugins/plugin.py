@@ -363,7 +363,7 @@ class Plugin(t.Generic[BotT]):
         self._message_command_checks: t.MutableSequence[AppCommandCheck] = []
         self._user_command_checks: t.MutableSequence[AppCommandCheck] = []
 
-        self._listeners: t.Dict[str | Event, t.MutableSequence[CoroFunc]] = {}
+        self._listeners: t.Dict[t.Union[str, Event], t.MutableSequence[CoroFunc]] = {}
         self._loops: t.List[tasks.Loop[t.Any]] = []
 
         # These are mainly here to easily run async code at (un)load time
