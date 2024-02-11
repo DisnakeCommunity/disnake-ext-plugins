@@ -14,6 +14,7 @@ from disnake.ext import commands
 from . import async_utils
 
 if t.TYPE_CHECKING:
+    from disnake import Event
     from disnake.ext import tasks
     from typing_extensions import ParamSpec, Self
 
@@ -362,7 +363,7 @@ class Plugin(t.Generic[BotT]):
         self._message_command_checks: t.MutableSequence[AppCommandCheck] = []
         self._user_command_checks: t.MutableSequence[AppCommandCheck] = []
 
-        self._listeners: t.Dict[str, t.MutableSequence[CoroFunc]] = {}
+        self._listeners: t.Dict[str | Event, t.MutableSequence[CoroFunc]] = {}
         self._loops: t.List[tasks.Loop[t.Any]] = []
 
         # These are mainly here to easily run async code at (un)load time
@@ -836,7 +837,11 @@ class Plugin(t.Generic[BotT]):
 
     # Listeners
 
-    def add_listeners(self, *callbacks: CoroFunc, event: t.Optional[str] = None) -> None:
+    def add_listeners(
+        self,
+        *callbacks: CoroFunc,
+        event: t.Optional[t.Union[str, Event]] = None,
+    ) -> None:
         """Add multiple listeners to the plugin.
 
         Parameters
@@ -851,7 +856,7 @@ class Plugin(t.Generic[BotT]):
             key = callback.__name__ if event is None else event
             self._listeners.setdefault(key, []).append(callback)
 
-    def listener(self, event: t.Optional[str] = None) -> t.Callable[[CoroFuncT], CoroFuncT]:
+    def listener(self, event: t.Optional[str | Event] = None) -> t.Callable[[CoroFuncT], CoroFuncT]:
         """Register a function as a listener on this plugin.
 
         This is the plugin equivalent of :meth:`commands.Bot.listen`.
