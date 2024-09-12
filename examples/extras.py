@@ -1,10 +1,11 @@
-from disnake.ext import commands, plugins
+import disnake_plugins
+from disnake.ext import commands
 
 # Sometimes you would want to attach some extra info to your plugin and grab
 # it back later in another command. For this, the so-called extras exist.
 # They don"t serve any actual purpose and are purely for use by the user.
 
-extras_plugin = plugins.Plugin(extras={"foo": "bar"})
+extras_plugin = disnake_plugins.Plugin(extras={"foo": "bar"})
 
 
 # Afterwards we can easily access this data.

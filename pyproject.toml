@@ -6,7 +6,7 @@ authors = ["Chromosomologist <chromosomologist@gmail.com>"]
 license = "MIT"
 readme = "README.md"
 packages = [
-    {include = "disnake/ext/plugins", from="src"}]
+    {include = "disnake_plugins", from="src"}]
 repository = "https://github.com/Chromosomologist/disnake-ext-plugins"
 keywords = [
     "disnake",

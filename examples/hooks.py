@@ -3,9 +3,9 @@ import contextvars
 import aiohttp
 
 import disnake
-from disnake.ext import plugins
+import disnake_plugins
 
-plugin = plugins.Plugin()
+plugin = disnake_plugins.Plugin()
 
 
 # Sometimes, it is desirable to attach extra behaviour to loading and unloading

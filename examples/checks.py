@@ -1,12 +1,13 @@
 import disnake
-from disnake.ext import commands, plugins
+import disnake_plugins
+from disnake.ext import commands
 
 Context = commands.Context[commands.Bot]
 
 
 # Create a basic plugin...
 
-plugin = plugins.Plugin()
+plugin = disnake_plugins.Plugin()
 
 
 # First, we define a local check...
