@@ -99,7 +99,7 @@ jobs:
 
       # We should have the cached venv from the install job here.
       - name: Run ruff
-        run: poetry run ruff .
+        run: poetry run ruff check .
 
       - name: Run slotscheck
         if: success() || failure()
