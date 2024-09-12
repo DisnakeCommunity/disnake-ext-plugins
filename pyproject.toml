@@ -32,7 +32,7 @@ classifiers=[
 
 [tool.poetry.dependencies]
 python = "^3.8"
-disnake = "^2.0"
+disnake = "^2.8"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^2.18.1"
