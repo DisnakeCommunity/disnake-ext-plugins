@@ -14,8 +14,9 @@ from disnake.ext import commands
 from . import async_utils
 
 if t.TYPE_CHECKING:
-    from disnake.ext import tasks
     from typing_extensions import ParamSpec, Self
+
+    from disnake.ext import tasks
 
     P = ParamSpec("P")
 
@@ -126,6 +127,7 @@ class PluginMetadata:
         Parameters to apply to each message command in this plugin.
     user_command_attrs: AppCommandParams
         Parameters to apply to each user command in this plugin.
+
     """
 
     name: str
@@ -193,6 +195,7 @@ def get_parent_plugin(obj: ExtrasAware) -> Plugin[AnyBot]:
     ------
     LookupError:
         The object is not registered to any plugin.
+
     """
     if plugin := obj.extras.get("plugin"):
         return plugin
@@ -267,6 +270,7 @@ class Plugin(t.Generic[BotT]):
         If not specified, defaults to `disnake.ext.plugins.plugin`.
     **extras: Dict[:class:`str`, Any]
         A dict of extra metadata for this plugin.
+
     """
 
     __slots__ = (
@@ -390,6 +394,7 @@ class Plugin(t.Generic[BotT]):
         :class:`Plugin`
             The newly created plugin. In a child class, this would instead
             return an instance of that child class.
+
         """
         self = cls()
         self.metadata = metadata
@@ -536,6 +541,7 @@ class Plugin(t.Generic[BotT]):
         ------
         TypeError
             The function is not a coroutine or is already a command.
+
         """
         attributes = self._apply_attrs(self.metadata.command_attrs, **kwargs)
 
@@ -588,6 +594,7 @@ class Plugin(t.Generic[BotT]):
         ------
         TypeError
             The function is not a coroutine or is already a command.
+
         """
         attributes = self._apply_attrs(self.metadata.command_attrs, **kwargs)
 
@@ -656,6 +663,7 @@ class Plugin(t.Generic[BotT]):
         Callable[..., :class:`commands.InvokableSlashCommand`]
             A decorator that converts the provided method into a
             :class:`commands.InvokableSlashCommand` and returns it.
+
         """
         attributes = self._apply_attrs(
             self.metadata.slash_command_attrs,
@@ -722,6 +730,7 @@ class Plugin(t.Generic[BotT]):
         Callable[..., :class:`commands.InvokableUserCommand`]
             A decorator that converts the provided method into a
             :class:`commands.InvokableUserCommand` and returns it.
+
         """
         attributes = self._apply_attrs(
             self.metadata.user_command_attrs,
@@ -786,6 +795,7 @@ class Plugin(t.Generic[BotT]):
         Callable[..., :class:`commands.InvokableMessageCommand`]
             A decorator that converts the provided method into an
             :class:`commands.InvokableMessageCommand` and then returns it.
+
         """
         attributes = self._apply_attrs(
             self.metadata.message_command_attrs,
@@ -839,7 +849,7 @@ class Plugin(t.Generic[BotT]):
     def add_listeners(
         self,
         *callbacks: CoroFunc,
-        event: t.Optional[t.Union[str, disnake.Event]] = None
+        event: t.Optional[t.Union[str, disnake.Event]] = None,
     ) -> None:
         """Add multiple listeners to the plugin.
 
@@ -850,6 +860,7 @@ class Plugin(t.Generic[BotT]):
         event: :class:`str`
             The name of a single event to register all callbacks under. If not provided,
             the callbacks will be registered individually based on function's name.
+
         """
         for callback in callbacks:
             if event is None:
@@ -862,7 +873,7 @@ class Plugin(t.Generic[BotT]):
 
     def listener(
         self,
-        event: t.Optional[t.Union[str, disnake.Event]] = None
+        event: t.Optional[t.Union[str, disnake.Event]] = None,
     ) -> t.Callable[[CoroFuncT], CoroFuncT]:
         """Register a function as a listener on this plugin.
 
@@ -873,6 +884,7 @@ class Plugin(t.Generic[BotT]):
         event: :class:`str`
             The name of the event being listened to. If not provided, it
             defaults to the function's name.
+
         """
 
         def decorator(callback: CoroFuncT) -> CoroFuncT:
@@ -899,6 +911,7 @@ class Plugin(t.Generic[BotT]):
             .. warn::
                 This only works if the loop does not already have a `before_loop`
                 callback registered.
+
         """
 
         def decorator(loop: LoopT) -> LoopT:
@@ -942,6 +955,7 @@ class Plugin(t.Generic[BotT]):
         ----------
         bot: Union[:class:`commands.Bot`, :class:`commands.InteractionBot`]
             The bot on which to register the plugin's commands.
+
         """
         self._bot = bot
 
@@ -984,6 +998,7 @@ class Plugin(t.Generic[BotT]):
         ----------
         bot: Union[:class:`commands.Bot`, :class:`commands.InteractionBot`]
             The bot from which to unload the plugin's commands.
+
         """
         await asyncio.gather(*(hook() for hook in self._pre_unload_hooks))
 
@@ -1023,6 +1038,7 @@ class Plugin(t.Generic[BotT]):
         ----------
         post: :class:`bool`
             Whether the hook is a post-load or pre-load hook.
+
         """
         hooks = self._post_load_hooks if post else self._pre_load_hooks
 
@@ -1042,6 +1058,7 @@ class Plugin(t.Generic[BotT]):
         ----------
         post: :class:`bool`
             Whether the hook is a post-unload or pre-unload hook.
+
         """
         hooks = self._post_unload_hooks if post else self._pre_unload_hooks
 
